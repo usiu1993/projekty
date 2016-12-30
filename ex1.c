@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <signal.h>
+#include <sys/types.h>
 #include <time.h>
 #include <string.h>
 #include <sys/time.h>
@@ -24,6 +25,8 @@ char* str2;
 char* str3;
 int ret_value;
 float d=0;
+
+int PIPE=0;
 
 //----------------------------------------------------------------------------
 
@@ -64,22 +67,23 @@ int main(int argc, char *argv[])
  struct itimerval timer;
  struct timespec time1;
 
- int temp;
  int num;
  int opt;
-
+ int fd[2];
+	pipe(fd);
+    close(fd[0]);
 
 
 //clockid_t flag;
     struct sigevent sev;
     struct itimerspec its;
 struct itimerspec it;
-    long long freq_nanosecs;
-    sigset_t mask;
+    //long long freq_nanosecs;
+   // sigset_t mask;
     struct sigaction sa;
     clockid_t flag;
 
-        while ((opt = getopt(argc, argv, ":m::d::w::c::p::f:")) != -1) 
+        while ((opt = getopt(argc, argv, ":m::d::w::c::p:f::s::")) != -1) 
 	{
                switch (opt) 
 	       {
@@ -91,30 +95,37 @@ struct itimerspec it;
                    break;
 
                case 'w':
-                printf("Establishing handler for signal %d\n", SIG);
+               // printf("Establishing handler for signal %d\n", SIG);
    		
 		flag=CLOCK_REALTIME;
 		//flag=CLOCK_PROCESS_CPUTIME_ID;
 
                    break;
                case 'c':
-    		printf("Establishing handler for signal %d\n", SIG);
+    		//printf("Establishing handler for signal %d\n", SIG);
    	
 		flag = CLOCK_MONOTONIC;
 		//flag =CLOCK_PROCESS_CPUTIME_ID;
                    break;
                case 'p':
-		    printf("Establishing handler for signal %d\n", SIG);
+		    //printf("Establishing handler for signal %d\n", SIG);
    	
 		flag =CLOCK_PROCESS_CPUTIME_ID;
                    break;
 		case 'f':
 			str2 = optarg;
 			break;
+		case 's':
+			pipe(fd);
+			fd[1]=atoi(optarg);
+			PIPE=1;
+			break;
+			
                default:
                    printf("Flaga to Cos poszlo nietak\n");
                    exit(1);
                }
+         
         }
 
 
@@ -136,10 +147,10 @@ struct itimerspec it;
  sigaction (SIGVTALRM, &sa1, NULL);
 
  /* Configure the timer to expire after 500 msec... */
- timer.it_value.tv_sec = 2;
+ timer.it_value.tv_sec = 8;
  timer.it_value.tv_usec = 0;
  /* ... and every 500 msec after that. */
- timer.it_interval.tv_sec = 2;
+ timer.it_interval.tv_sec = 8;
  timer.it_interval.tv_usec = 0;
  /* Start a virtual timer. It counts down whenever this process is
    executing. */
@@ -148,20 +159,22 @@ struct itimerspec it;
   char *myfifo2=(char*) malloc(15*sizeof(*myfifo2));
   myfifo2=str2;
   
-  if(mkfifo(myfifo2, 0666)==-1)
-		printf("Nie utworzono fifo\n");
-	else 
-		printf("utworzono\n");
+  
+    if (access(myfifo2, F_OK) == -1){
+			mkfifo(myfifo2, 0666);
+		}
+	//else 
+		//printf("utworzono\n");
 	
    server_to_client = open(myfifo2, O_WRONLY);
-   //printf("deskryptor %d\n",server_to_client[num]);
- printf("Server ON.\n");
+  
+// printf("Server ON.\n");
 
- printf("Sending...\n");
+ //printf("Sending...\n");
 //-------------------------------------------------------------
 	//signal(SIGPIPE, signal_callback_handler);
 	
-    its.it_value.tv_sec =5;
+    its.it_value.tv_sec =10;
     its.it_value.tv_nsec = 0;
     its.it_interval.tv_sec = its.it_value.tv_sec;
     its.it_interval.tv_nsec = its.it_value.tv_nsec;
@@ -171,22 +184,30 @@ float rtime;
 	 while (g_running){
 	
 	timer_gettime (timerid, &it);
-	printf("GET : sec:%ld, nsec:%ld\n",it.it_value.tv_sec,it.it_value.tv_nsec);
+	//printf("GET : sec:%ld, nsec:%ld\n",it.it_value.tv_sec,it.it_value.tv_nsec);
 	clock_gettime(CLOCK_REALTIME, &time1);
 	//for (int i = 0; i< 242000000; i++)
 	//	temp+=temp;
 	//clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time2);
 	printf("sec:%ld, nsec:%ld\n",time1.tv_sec,time1.tv_nsec);
 //----------------------------------------------------------------
-	snprintf(buf, 50, "sec:%ld, nsec:%ld\n",time1.tv_sec,time1.tv_nsec);
+	snprintf(buf, 31, "sec:%ld, nsec:%ld\n",time1.tv_sec,time1.tv_nsec);
+	/*if(!PIPE){
 	write(server_to_client, buf, strlen(buf)+1);
-	printf("buf to %s\n",buf);
+	}
+	else{
+	write(fd[1], buf, strlen(buf)+1);	
+	}*/
+	
+	//printf("buf to %s\n",buf);
 //----------------------------------------------------------------
 	 setitimer (ITIMER_VIRTUAL, &timer, NULL);
 	rtime = (num-d)+(float)rand() / RAND_MAX * (2*d);
-	printf("rtime %lf",rtime);
+	//printf("rtime %lf",rtime);
+	while(rtime<=0)
+		rtime = (num-d)+(float)rand() / RAND_MAX * (2*d);
+		
 	sleep(rtime);
-	//free(buf);
 
 }
 
@@ -200,6 +221,7 @@ float rtime;
             exit(9);
         }
 	unlink(myfifo2);
+	
     sleep(100);
     exit(EXIT_SUCCESS);
 }

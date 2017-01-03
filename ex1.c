@@ -36,11 +36,11 @@ static void handler(int sig, siginfo_t *si, void *uc)
     if(si->si_value.sival_ptr != &timerid){
         printf("Stray signal\n");
     } else {
-        printf("Caught signal %d from timer\n", sig);
+       // printf("Caught signal %d from timer\n", sig);
     }
 //exit(1);
 g_running = 0;
-    sleep(2);
+    
     exit(EXIT_SUCCESS);
 }
 
@@ -55,7 +55,7 @@ void timer_handler (int signum)
 }
 void signal_callback_handler(int signum){
 
-        printf("Caught signal SIGPIPE %d\n",signum);
+     //   printf("Caught signal SIGPIPE %d\n",signum);
 }
 
 
@@ -156,15 +156,15 @@ struct itimerspec it;
    executing. */
 //--------------------------------------------------------------
   char *buf=(char*) malloc(50*sizeof(*buf));	
-  char *myfifo2=(char*) malloc(15*sizeof(*myfifo2));
+  char *myfifo2=(char*) malloc(50*sizeof(*myfifo2));
   myfifo2=str2;
   
   
     if (access(myfifo2, F_OK) == -1){
 			mkfifo(myfifo2, 0666);
 		}
-	//else 
-		//printf("utworzono\n");
+	else 
+		printf("utworzono wczesniej \n");
 	
    server_to_client = open(myfifo2, O_WRONLY);
   
@@ -182,7 +182,12 @@ struct itimerspec it;
 float rtime;
    
 	 while (g_running){
-	
+		rtime = (num-d)+(float)rand() / RAND_MAX * (2*d);
+	//printf("rtime %lf",rtime);
+	while(rtime<=0)
+		rtime = (num-d)+(float)rand() / RAND_MAX * (2*d);
+		
+	sleep(rtime);
 	timer_gettime (timerid, &it);
 	//printf("GET : sec:%ld, nsec:%ld\n",it.it_value.tv_sec,it.it_value.tv_nsec);
 	clock_gettime(CLOCK_REALTIME, &time1);
@@ -190,8 +195,10 @@ float rtime;
 	//	temp+=temp;
 	//clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time2);
 	printf("sec:%ld, nsec:%ld\n",time1.tv_sec,time1.tv_nsec);
+	fflush(stdout);
 //----------------------------------------------------------------
 	snprintf(buf, 31, "sec:%ld, nsec:%ld\n",time1.tv_sec,time1.tv_nsec);
+	//write(STDOUT_FILENO, buf, sizeof(buf)-1);
 	/*if(!PIPE){
 	write(server_to_client, buf, strlen(buf)+1);
 	}
@@ -202,12 +209,7 @@ float rtime;
 	//printf("buf to %s\n",buf);
 //----------------------------------------------------------------
 	 setitimer (ITIMER_VIRTUAL, &timer, NULL);
-	rtime = (num-d)+(float)rand() / RAND_MAX * (2*d);
-	//printf("rtime %lf",rtime);
-	while(rtime<=0)
-		rtime = (num-d)+(float)rand() / RAND_MAX * (2*d);
-		
-	sleep(rtime);
+
 
 }
 
@@ -221,7 +223,7 @@ float rtime;
             exit(9);
         }
 	unlink(myfifo2);
-	
-    sleep(100);
+	free(myfifo2);
+    //sleep(100);
     exit(EXIT_SUCCESS);
 }

@@ -15,10 +15,34 @@
 #define BLOCK_SIZE 31
 
 
+	
+
+
+void signal_callback_handler(int signum){
+
+        printf("Caught signal SIGPIPE %d\n",signum);
+        
+}
+
+
+
+
 void copy_stdin2stdout(int* where,int size)
 {
+	struct sigaction mySignalStruct;
+	mySignalStruct.sa_handler = signal_callback_handler;
+    mySignalStruct.sa_flags   = 0;    
+
+    sigemptyset( &mySignalStruct.sa_mask); 
+    sigaddset  ( &mySignalStruct.sa_mask, SIGINT);
+
+    if (sigaction(SIGPIPE, &mySignalStruct, NULL) < 0)
+    {
+        fprintf(stderr, "sigaction error\n");
+        exit(1);
+    }
 	 ssize_t bytes;
-   size_t total_bytes;
+   //size_t total_bytes;
    //fd_set fdset;
    //int ret;
     char buffer[BLOCK_SIZE];
@@ -32,57 +56,27 @@ void copy_stdin2stdout(int* where,int size)
 		   
 		//printf("where[%d] to %d\n",i,where[i]);
 			if(where[i]!=0){
-			//	 FD_ZERO(&fdset);
-            //FD_SET(where[i],&fdset);
-				//ret = select(where[i]+1,&fdset,NULL,NULL,NULL);
-				//printf("ret %d\n",ret);
-				total_bytes = 0;
-				
-				  if ((bytes = write(where[i], buffer, 31)) == -1){
-            
-            printf("elooo\n");
-            sleep(5);
-            //perror("write");
-		}
-        else
-            printf("speak: wrote %ld bytes\n", bytes);
-				
-				
-				
-				//bytes=write(where[i], buffer, 31);
-			/*	if (write(where[i], buffer, 31) < 0) {
-					printf("Failed to write into fifo: %s", strerror(errno));
+				signal(SIGPIPE, signal_callback_handler);	
+				if ((bytes = write(where[i], buffer, BLOCK_SIZE)) == -1){
+                       where[i]=0;
+                       printf("wyrzucam kanał /tmp/%d\n",i);   
+					}
+				else if(bytes<BLOCK_SIZE)
+				{
 					where[i]=0;
-					exit(1); */
-				/*if (bytes > 0) {
-                    total_bytes += (size_t)bytes;
-                    printf("done reading (%lu bytes)\n", total_bytes);
-               }
-               else{
-                    if (errno == EWOULDBLOCK) {
-                        /* Done reading 
-                        printf("ararar");
-                        break;
-                    } else {
-                        perror("read");
-                      //  return EXIT_FAILURE;
-                    }	
-				}*/
-}
-				//bytes += write(where[i], buffer, 31);
-				//printf("Pipsiz: %d\n",(int)bytes);
+					printf("wyrzucam kanał /tmp/%d\n",i); 
+				//KANAŁ PRZEPEŁNIONY DO WYJEBANIA 
+				}
+				else
+				printf("wrote %ld bytes\n", bytes);
 				
 				}
-			}
+			}}
 			 break;
-		//write(where[2], buffer, strlen(buffer)+1);
+		
 }
-       //write(w2, buffer, strlen(buffer)+1);
-        //fflush(stdout);
-    //    if (bytes < BLOCK_SIZE)
-      //      if (feof(stdin))
-      //      {  //memset(buffer, 0, sizeof(buffer));
-               
+     
+              
     }
 
 
@@ -104,8 +98,8 @@ int main(int argc, char** argv)
 	int opt;
 	int c;
 	char* nazwa;
-	struct stat statbuf;
-	char* nr=(char*) malloc(2*sizeof(*nr));
+	//struct stat statbuf;
+	char* nr=(char*) malloc(5*sizeof(*nr));
 
 
 
@@ -130,139 +124,71 @@ int main(int argc, char** argv)
 			}
 	}
 	
-	char *wzorzec=(char*) malloc(15*sizeof(*nr));
-	int *fd=(int*) malloc(2*sizeof(*fd));
+	char *wzorzec=(char*) malloc(50*sizeof(*nr));
+	int *fd=(int*) malloc(10*sizeof(*fd));
 	strcpy(wzorzec, nazwa);
 
 	//-------------------------------------------------
 	char **a = malloc(sizeof *a * c);
-if (a)
-{
-  for (int i = 1 ; i<= c; i++)
-  {
-    a[i] = malloc(sizeof *a[i] * 30);
+//if (a)
+//{
+  for (int i = 1 ; i<c; i++)
+  {struct stat statbuf;
+    a[i] = malloc(sizeof *a[i] * 100);
     sprintf(nr,"%d",i);
 	strcat(wzorzec, nr);
-	if (stat(wzorzec, &statbuf) == -1) { perror("stat"); continue; }	
-	
-	
+	//if (
+	//stat(wzorzec, &statbuf) == -1) 
+	//{ perror("stat"); continue; }	
+	//printf("wzorzec to %s\n",wzorzec);
+		memset (&statbuf, 0, sizeof (statbuf));
+	stat(wzorzec, &statbuf); 
+	//int t=S_ISFIFO(statbuf.st_mode);
 	if (S_ISFIFO(statbuf.st_mode))
+	{	printf("w fifo %d\n",i);
 		strcpy(a[i],wzorzec);
-	else 
-		a[i]=NULL;
+	}
+	 
+		
     
     
     strcpy(wzorzec, nazwa);
+    //printf("wzorzec na koncu %s\n",wzorzec);
   }
-}
+//}
 	int *d=(int*) malloc(10*sizeof(*d));
 	for(int j=1;j<c;j++)
 	{
 		
 		printf("%s\n",a[j]);
+
 		printf("------------\n");
 		}
 	
 	
 	
 	
-	/*while(a[k]!=NULL)
-	{
-		fd[k]=open(a[k],O_WRONLY);	
-		printf("fd[%d] zwrocilo %d\n",k,fd[k]);
-		if(fd[k]!=0)
-			d[k]=fd[k];	
-		k++;
-	}*/
-	//int pipesiz=100;
 	for(int k=1;k<=c;k++)
 	{
 		fd[k]=open(a[k],O_WRONLY | O_NONBLOCK);	
 		printf("fd[%d] zwrocilo %d\n",k,fd[k]);
-		//fcntl(fd[k],F_SETPIPE_SZ,100);
+		
 		int pipesize = fcntl(fd[k], F_GETPIPE_SZ);
 		printf("Pipe size: %d\n", pipesize);
 		if(fd[k]!=-1)
 			d[k]=fd[k];	
 		}
 	
-	for(int j=1;j<=c;j++)
-	{
+		for(int j=1;j<=c;j++)
+		{
 		
 		printf("w d %d\n",d[j]);
 		printf("------------\n");
 		}
 	
 	
-copy_stdin2stdout(d,c);
+	copy_stdin2stdout(d,c);
 	
-	
-	//printf("%s",wzorzec);
-	//for(int i=1;i<=c;i++)
-//{
+	return 0;
 
-//sprintf(nr,"%d",i);
-//strcat(wzorzec, nr);
-//printf("nazwa: %s\n",wzorzec);
-//if (stat(wzorzec, &statbuf) == -1) { perror("stat"); continue; }	
-//if (S_ISFIFO(statbuf.st_mode))
-//{ 
-//printf("File is a fifo pipe\n");
-//a[i]=wzorzec;
-//printf("w tablicy %s a i to %d\n",a[i],i);
-
-/*
-
-a[1]="/tmp/1";
-a[2]="/tmp/2";
-
-
-int fd = open(a[1],O_WRONLY);
-int fd1=open(a[2],O_WRONLY);
-printf("Fd dla  zworiclo %d\n",fd);
-printf("Fd1 dla  zworiclo %d\n",fd1);
-if(fd!=0)
-{
-	//int server_to_client;
-   //server_to_client = open(, O_WRONLY);
-	copy_stdin2stdout(fd,fd1);
-}
-
-else
-printf("File is not a fifo\n");
-
-//strcpy(wzorzec, nazwa);
-//printf("nazwa: %s\n",nazwa);
-//}
-//printf("w tablicy %s\n",a[1]);
-
-
-
-*/
-	
-/*	
- char *myfifo2=(char*) malloc(15*sizeof(*myfifo2));
- myfifo2=nazwa;
-  
-  
-   if (access(myfifo2, F_OK) == -1){
-			mkfifo(myfifo2, 0666);
-		}
-	else 
-		printf("utworzono\n");
-	
-	int server_to_client;
-   server_to_client = open(myfifo2, O_WRONLY);
-  
- printf("Server ON.\n");
-
- printf("Sending...\n");
-
-
-
-
-copy_stdin2stdout(server_to_client);
-printf("%d\n",c);
-return 0;
-* */
 }

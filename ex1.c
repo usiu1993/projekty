@@ -44,15 +44,7 @@ g_running = 0;
     exit(EXIT_SUCCESS);
 }
 
-void timer_handler (int signum)
-{
- static int count = 0;
- struct timeval ts;
- count += 1;
- gettimeofday(&ts, NULL);	
- printf ("  timer expired %d times\n",  count);
 
-}
 void signal_callback_handler(int signum){
 
      //   printf("Caught signal SIGPIPE %d\n",signum);
@@ -69,7 +61,9 @@ int main(int argc, char *argv[])
 
  int num;
  int opt;
+ float czas;
  int fd[2];
+ int pipeIn;
 	pipe(fd);
     close(fd[0]);
 
@@ -83,7 +77,7 @@ struct itimerspec it;
     struct sigaction sa;
     clockid_t flag;
 
-        while ((opt = getopt(argc, argv, ":m::d::w::c::p:f::s::")) != -1) 
+        while ((opt = getopt(argc, argv, ":m::d::w::c::p::f::s::")) != -1) 
 	{
                switch (opt) 
 	       {
@@ -96,28 +90,28 @@ struct itimerspec it;
 
                case 'w':
                // printf("Establishing handler for signal %d\n", SIG);
-   		
+   		czas=atof(optarg);
 		flag=CLOCK_REALTIME;
 		//flag=CLOCK_PROCESS_CPUTIME_ID;
 
                    break;
                case 'c':
     		//printf("Establishing handler for signal %d\n", SIG);
-   	
+		czas=atof(optarg);	
 		flag = CLOCK_MONOTONIC;
 		//flag =CLOCK_PROCESS_CPUTIME_ID;
                    break;
                case 'p':
 		    //printf("Establishing handler for signal %d\n", SIG);
-   	
+		czas=atof(optarg);
 		flag =CLOCK_PROCESS_CPUTIME_ID;
                    break;
 		case 'f':
 			str2 = optarg;
 			break;
 		case 's':
-			pipe(fd);
-			fd[1]=atoi(optarg);
+			//pipe(fd);
+			pipeIn=atoi(optarg);
 			PIPE=1;
 			break;
 			
@@ -141,19 +135,7 @@ struct itimerspec it;
 
 
 	
-/* Install timer_handler as the signal handler for SIGVTALRM. */
- memset (&sa1, 0, sizeof (sa1));
- sa1.sa_handler = &timer_handler;
- sigaction (SIGVTALRM, &sa1, NULL);
 
- /* Configure the timer to expire after 500 msec... */
- timer.it_value.tv_sec = 8;
- timer.it_value.tv_usec = 0;
- /* ... and every 500 msec after that. */
- timer.it_interval.tv_sec = 8;
- timer.it_interval.tv_usec = 0;
- /* Start a virtual timer. It counts down whenever this process is
-   executing. */
 //--------------------------------------------------------------
   char *buf=(char*) malloc(50*sizeof(*buf));	
   char *myfifo2=(char*) malloc(50*sizeof(*myfifo2));
@@ -163,8 +145,8 @@ struct itimerspec it;
     if (access(myfifo2, F_OK) == -1){
 			mkfifo(myfifo2, 0666);
 		}
-	else 
-		printf("utworzono wczesniej \n");
+ 
+		
 	
    server_to_client = open(myfifo2, O_WRONLY);
   
@@ -173,38 +155,71 @@ struct itimerspec it;
  //printf("Sending...\n");
 //-------------------------------------------------------------
 	//signal(SIGPIPE, signal_callback_handler);
-	
-    its.it_value.tv_sec =10;
-    its.it_value.tv_nsec = 0;
+	//printf("czas %f\n",czas);
+	int cz=(int)czas;
+	//printf("czas %d\n",cz);
+	czas=czas-cz;
+	//printf("czas %f\n",czas);
+	int cz1= czas*1000000000;
+	//printf("czas %d\n",cz);
+    its.it_value.tv_sec =cz;
+    its.it_value.tv_nsec = cz1;
+    //printf("CZAS to sec: %ld nsec %ld\n",its.it_value.tv_sec,its.it_value.tv_nsec);
     its.it_interval.tv_sec = its.it_value.tv_sec;
     its.it_interval.tv_nsec = its.it_value.tv_nsec;
     timer_settime(timerid, 0, &its, NULL);
 float rtime;
    
+   struct timespec spi;
+		
+   
 	 while (g_running){
 		rtime = (num-d)+(float)rand() / RAND_MAX * (2*d);
-	//printf("rtime %lf",rtime);
+	
 	while(rtime<=0)
 		rtime = (num-d)+(float)rand() / RAND_MAX * (2*d);
+	//-----------------------------------------------------
+	int Irtime=(int)rtime;
+	//printf("czas %d\n",cz);
+	rtime=rtime-Irtime;
+	//printf("czas %f\n",czas);
+	int RTIME= czas*1000000000;
+	//printf("czas %d\n",cz);
+    its.it_value.tv_sec =cz;
+    its.it_value.tv_nsec = cz1;
+    //-----------------------------------------------------
+	
 		
-	sleep(rtime);
+	spi.tv_sec=Irtime;
+	spi.tv_nsec=RTIME;	
+		
+	//sleep(rtime);
+	nanosleep(&spi,NULL);
+	
+	
 	timer_gettime (timerid, &it);
 	//printf("GET : sec:%ld, nsec:%ld\n",it.it_value.tv_sec,it.it_value.tv_nsec);
 	clock_gettime(CLOCK_REALTIME, &time1);
 	//for (int i = 0; i< 242000000; i++)
 	//	temp+=temp;
 	//clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time2);
-	printf("sec:%ld, nsec:%ld\n",time1.tv_sec,time1.tv_nsec);
-	fflush(stdout);
+	//------------------------------------------------------------
+	//printf("sec:%ld, nsec:%ld\n",time1.tv_sec,time1.tv_nsec);
+	//fflush(stdout);
 //----------------------------------------------------------------
-	snprintf(buf, 31, "sec:%ld, nsec:%ld\n",time1.tv_sec,time1.tv_nsec);
+	snprintf(buf, 32, "sec:%ld, nsec:%ld\n",time1.tv_sec,time1.tv_nsec);
 	//write(STDOUT_FILENO, buf, sizeof(buf)-1);
-	/*if(!PIPE){
-	write(server_to_client, buf, strlen(buf)+1);
+	if(!PIPE){
+		//fd[k]=open(myfifo2,O_WRONLY | O_NONBLOCK);	
+	write(server_to_client, buf, 32);
+	
 	}
 	else{
-	write(fd[1], buf, strlen(buf)+1);	
-	}*/
+		//printf("sec:%ld, nsec:%ld\n",time1.tv_sec,time1.tv_nsec);
+		//fflush(stdout);
+	write(pipeIn,buf,32);	
+		
+	}
 	
 	//printf("buf to %s\n",buf);
 //----------------------------------------------------------------

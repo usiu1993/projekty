@@ -100,7 +100,7 @@ char str4[BUFSIZ];
 	int server_to_client;
 	//O_RDONLY
 	
-char str1[31];
+char str1[33];
 long int time11, time2;
 
 //while(1);
@@ -114,7 +114,7 @@ while(read(server_to_client,str1,sizeof(str1)))
 
   
   // perror("Read:"); // Very crude error check
-
+fflush(stdout);
 printf("...received: %s\n",str1);
 //printf("HELLO\n");
 sscanf(str1, "sec:%ld, nsec:%ld\n", &time11,&time2);

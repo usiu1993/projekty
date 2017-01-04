@@ -15,12 +15,20 @@
 #define BLOCK_SIZE 31
 
 
-	
+/*
+static void handler(int sig, siginfo_t *si, void *uc,int where)
+{
+    fprintf(stderr,"writting error, broken pipe\n");
+                       where[i]=0;
+                       fprintf(stderr,"wyrzucam kanał /tmp/%d\n",i);
+    
+}	
 
-
-void signal_callback_handler(int signum){
+*/
+ void signal_callback_handler(int signum){
 
         printf("Caught signal SIGPIPE %d\n",signum);
+        
         
 }
 
@@ -29,6 +37,16 @@ void signal_callback_handler(int signum){
 
 void copy_stdin2stdout(int* where,int size)
 {
+	//---------------
+	/*struct sigaction sa;
+	sa.sa_flags = SA_SIGPIPE;
+   		sa.sa_sigaction = handler;
+   		 sigemptyset(&sa.sa_mask);
+    		sigaction(SIG, &sa, NULL);
+	//-----------------*/
+	
+	
+	
 	struct sigaction mySignalStruct;
 	mySignalStruct.sa_handler = signal_callback_handler;
     mySignalStruct.sa_flags   = 0;    
@@ -50,21 +68,24 @@ void copy_stdin2stdout(int* where,int size)
 		//size_t size1=50;
 		
 		//----------------------------------------------
-		while(read(STDIN_FILENO, buffer, 31)){
+		while(read(STDIN_FILENO, buffer, 32)){
 	
-       for(int i=1;i<size;i++){
+       for(int i=0;i<size;i++){
 		   
 		//printf("where[%d] to %d\n",i,where[i]);
 			if(where[i]!=0){
-				signal(SIGPIPE, signal_callback_handler);	
+				sigaction(SIGPIPE, &mySignalStruct, NULL);
+				//signal(SIGPIPE, signal_callback_handler);	
 				if ((bytes = write(where[i], buffer, BLOCK_SIZE)) == -1){
+						fprintf(stderr,"writting error, broken pipe\n");
                        where[i]=0;
-                       printf("wyrzucam kanał /tmp/%d\n",i);   
+                       fprintf(stderr,"wyrzucam kanał /tmp/%d\n",i); 
 					}
 				else if(bytes<BLOCK_SIZE)
 				{
+					fprintf(stderr,"writing error, full pipe\n");
 					where[i]=0;
-					printf("wyrzucam kanał /tmp/%d\n",i); 
+					fprintf(stderr,"wyrzucam kanał /tmp/%d\n",i); 
 				//KANAŁ PRZEPEŁNIONY DO WYJEBANIA 
 				}
 				else
@@ -94,13 +115,13 @@ int file_exist (char *filename)
 
 
 int main(int argc, char** argv)
-{
+{	int A =0;	
 	int opt;
 	int c;
 	char* nazwa;
 	//struct stat statbuf;
 	char* nr=(char*) malloc(5*sizeof(*nr));
-
+	int err;
 
 
 	  while ((opt = getopt(argc, argv, ":p:c::L::")) != -1) 
@@ -123,6 +144,15 @@ int main(int argc, char** argv)
 		
 			}
 	}
+	if(A)
+	{
+	 err = open("cout.txt", O_RDWR|O_CREAT|O_APPEND, 0600);
+    if (-1 == err) { perror("opening cout.txt"); return 255; }	
+
+	if (-1 == dup2(err, fileno(stderr))) { perror("cannot redirect stderr"); return 255; }
+}
+	
+	
 	
 	char *wzorzec=(char*) malloc(50*sizeof(*nr));
 	int *fd=(int*) malloc(10*sizeof(*fd));
@@ -132,7 +162,7 @@ int main(int argc, char** argv)
 	char **a = malloc(sizeof *a * c);
 //if (a)
 //{
-  for (int i = 1 ; i<c; i++)
+  for (int i = 0 ; i<c; i++)
   {struct stat statbuf;
     a[i] = malloc(sizeof *a[i] * 100);
     sprintf(nr,"%d",i);
@@ -148,7 +178,8 @@ int main(int argc, char** argv)
 	{	printf("w fifo %d\n",i);
 		strcpy(a[i],wzorzec);
 	}
-	 
+	else
+		fprintf(stderr,"%s is not fifo file\n",wzorzec);
 		
     
     
@@ -157,7 +188,7 @@ int main(int argc, char** argv)
   }
 //}
 	int *d=(int*) malloc(10*sizeof(*d));
-	for(int j=1;j<c;j++)
+	for(int j=0;j<c;j++)
 	{
 		
 		printf("%s\n",a[j]);
@@ -168,18 +199,26 @@ int main(int argc, char** argv)
 	
 	
 	
-	for(int k=1;k<=c;k++)
+	for(int k=0;k<c;k++)
 	{
 		fd[k]=open(a[k],O_WRONLY | O_NONBLOCK);	
-		printf("fd[%d] zwrocilo %d\n",k,fd[k]);
+		//printf("fd[%d] zwrocilo %d\n",k,fd[k]);
 		
-		int pipesize = fcntl(fd[k], F_GETPIPE_SZ);
-		printf("Pipe size: %d\n", pipesize);
+		//int pipesize = fcntl(fd[k], F_GETPIPE_SZ);
+		//printf("Pipe size: %d\n", pipesize);
 		if(fd[k]!=-1)
+		{
+			printf("%s is opened to write\n",a[k]);
 			d[k]=fd[k];	
+				
 		}
-	
-		for(int j=1;j<=c;j++)
+		else if(strcmp(a[k],"")!=0){
+		fprintf(stderr, "Value of errno: %d for %s \n",errno, a[k]);
+	}	
+		
+	}
+		
+		for(int j=0;j<c;j++)
 		{
 		
 		printf("w d %d\n",d[j]);
@@ -189,6 +228,11 @@ int main(int argc, char** argv)
 	
 	copy_stdin2stdout(d,c);
 	
+if(A)
+{		
+	//fflush(stdout);
+	 close(err);
+}	
 	return 0;
 
 }

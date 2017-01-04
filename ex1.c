@@ -30,6 +30,13 @@ int PIPE=0;
 
 //----------------------------------------------------------------------------
 
+void timer_handler (int signum)
+{
+  static int count = 0;
+  printf ("timer expired %d times\n", ++count);
+}
+
+
 
 static void handler(int sig, siginfo_t *si, void *uc)
 {
@@ -55,11 +62,14 @@ void signal_callback_handler(int signum){
 int main(int argc, char *argv[])
 {   
 
- struct sigaction sa1;
- struct itimerval timer;
+ //struct sigaction sa1;
+// struct itimerval timer;
  struct timespec time1;
 
  int num;
+ int m=0;
+ int req=1;
+ int f=0;
  int opt;
  float czas;
  int fd[2];
@@ -71,17 +81,26 @@ int main(int argc, char *argv[])
 //clockid_t flag;
     struct sigevent sev;
     struct itimerspec its;
-struct itimerspec it;
+	struct itimerspec it;
     //long long freq_nanosecs;
    // sigset_t mask;
     struct sigaction sa;
     clockid_t flag;
+	
+	if(argc<3)
+	{
+				printf(" ARG Required -m[sec] -f(fifo)/s(pipe)\n");
+                exit(1);
 
-        while ((opt = getopt(argc, argv, ":m::d::w::c::p::f::s::")) != -1) 
+	}
+
+
+        while ((opt = getopt(argc, argv, "m:d:w:c:p:f:s:")) != -1) 
 	{
                switch (opt) 
 	       {
 	       case 'm':
+	     m++;
 		 num=atof(optarg);
                    break;
                case 'd':
@@ -89,39 +108,71 @@ struct itimerspec it;
                    break;
 
                case 'w':
-               // printf("Establishing handler for signal %d\n", SIG);
+               req--;
    		czas=atof(optarg);
 		flag=CLOCK_REALTIME;
-		//flag=CLOCK_PROCESS_CPUTIME_ID;
-
-                   break;
+		break;
                case 'c':
-    		//printf("Establishing handler for signal %d\n", SIG);
+        if(req!=0){
+    	req--;
 		czas=atof(optarg);	
 		flag = CLOCK_MONOTONIC;
-		//flag =CLOCK_PROCESS_CPUTIME_ID;
-                   break;
-               case 'p':
-		    //printf("Establishing handler for signal %d\n", SIG);
+		break;
+		}
+		else{		
+		printf("option already chosen\n");
+		exit(2);
+		}
+			
+             case 'p':
+		if(req!=0){
+		req--;
 		czas=atof(optarg);
 		flag =CLOCK_PROCESS_CPUTIME_ID;
-                   break;
+		break;
+		}
+		else{		
+		printf("option already chosen\n");
+		exit(2);
+		}
+           
 		case 'f':
+			f++;
 			str2 = optarg;
 			break;
 		case 's':
 			//pipe(fd);
+			printf("jestem tu\n");
+			f++;
 			pipeIn=atoi(optarg);
 			PIPE=1;
 			break;
 			
+       
+		
                default:
-                   printf("Flaga to Cos poszlo nietak\n");
+                   printf("Wymagane -m[sec] -f(fifo)/s(pipe)\n");
                    exit(1);
                }
+          /*    if(f==0){
+			printf("nie wybrano f lub s\n");
+			exit(1);
+		}*/
+		
+		
+         
          
         }
+        
+ 
 
+	    if(!f||!m){
+			printf("nie wybrano m oraz f lub s\n");
+			exit(1);
+		}
+		
+		
+		
 
 		sa.sa_flags = SA_SIGINFO;
    		sa.sa_sigaction = handler;
@@ -223,7 +274,7 @@ float rtime;
 	
 	//printf("buf to %s\n",buf);
 //----------------------------------------------------------------
-	 setitimer (ITIMER_VIRTUAL, &timer, NULL);
+	 //setitimer (ITIMER_VIRTUAL, &timer, NULL);
 
 
 }
@@ -241,4 +292,5 @@ float rtime;
 	free(myfifo2);
     //sleep(100);
     exit(EXIT_SUCCESS);
+    
 }

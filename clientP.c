@@ -23,14 +23,14 @@ void timer_handler (int signum)
  
 
 }
-
+int czas;
 
 void display_message(int s) {
 	struct timespec time2;
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time2);
  
  printf("!!!!!  Stil alive :sec %ld, nsec %ld\n",time2.tv_sec,time2.tv_nsec);
-     alarm(0);    //for every second
+     alarm(czas);    //for every second
      signal(SIGALRM, display_message);
 }
 
@@ -42,7 +42,7 @@ int main(int argc, char** argv)
 
 	struct timespec time1;
 	int opt;
-	char* str2;
+	char str2[50];
 	int ret_value;
 	float d;
 	
@@ -55,23 +55,33 @@ struct sigaction sa;
 	
 	
 	
- while ((opt = getopt(argc, argv, ":c:")) != -1) 
+ while ((opt = getopt(argc, argv, ":d:")) != -1) 
 	{
                switch (opt) 
 	       {
               
-               case 'c':
+               /*case 'c':
                   str2 = optarg;
-                   break;
-              /* case 'd':
-					d=atof(optarg);
+                   break;*/
+               case 'd':
+					czas=atof(optarg);
 					break;
-					*/
+					
                default:
                    printf("Usage: %s [-t ntime(sec)] [-c string]\n", argv[0]);
                    exit(1);
                }
     }
+    if(optind<argc)
+    {
+		while(optind<argc)
+			{
+					strncpy(str2,argv[optind],50);
+					printf("%s \n",str2);
+					optind++;
+				}
+		
+		}
        
 
 //----------------------------------------------------------------------
@@ -105,7 +115,7 @@ long int time11, time2;
 
 //while(1);
 signal(SIGALRM, display_message);
-    alarm(0);
+    alarm(czas);
     
     if(access(myfifo2,F_OK) != -1)
 		server_to_client = open(myfifo2,O_RDONLY);
@@ -120,7 +130,10 @@ printf("...received: %s\n",str1);
 sscanf(str1, "sec:%ld, nsec:%ld\n", &time11,&time2);
 clock_gettime(CLOCK_REALTIME, &time1);
 printf("..my time is   :sec %ld, nsec %ld\n",time1.tv_sec,time1.tv_nsec);
-printf("...difference :sec %ld, nsec %ld\n",time1.tv_sec-time11,time1.tv_nsec-time2);
+long int sec=time1.tv_sec-time11;
+long int nsec=time1.tv_nsec-time2;
+//printf("...difference :sec %ld, nsec %ld\n",time1.tv_sec-time11,time1.tv_nsec-time2);
+printf("...difference :sec %ld, nsec %ld\n",sec,nsec);
 	
   memset(str1, 0, sizeof(str1));
 }

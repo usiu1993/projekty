@@ -23,7 +23,6 @@ void odczytZapis(int* kolejka,int iFifo)
 	struct sigaction sigpipeS;
 	sigpipeS.sa_handler = sigpipe_handler;
 	sigpipeS.sa_flags   = 0;    
-
 	sigemptyset(&sigpipeS.sa_mask); 
 	sigaddset(&sigpipeS.sa_mask, SIGINT);
 	ssize_t ilBajt;   
@@ -190,7 +189,5 @@ int main(int argc, char** argv)
 	free(nazwaKol);
 	free(aktywneKol);	
 	free(nr);
-	free(nazwaPliku);
 	return 0;
-
 }

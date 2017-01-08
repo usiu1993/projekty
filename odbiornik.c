@@ -15,7 +15,7 @@ void komunikat(int sig) {
 	struct timespec czasProc;
 	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &czasProc);
 
-	printf("Komunikat odbiorcy  sec: %ld, nsec: %ld\n",czasProc.tv_sec,czasProc.tv_nsec);
+	printf("\n\nKomunikat odbiorcy  sec: %ld, nsec: %ld\n\n\n",czasProc.tv_sec,czasProc.tv_nsec);
 	alarm(czas);    
 	signal(SIGALRM, komunikat);
 }

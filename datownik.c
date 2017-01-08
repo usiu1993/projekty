@@ -41,9 +41,9 @@ void timer_handler (int signum)
 	struct sigaction sa1;
 	struct itimerval timer1;
 	srand( time( NULL ) );
-		// Konfiguracja sygnału dla timera
 	memset (&timer1, 0, sizeof (timer1));
 	memset (&sa1, 0, sizeof (sa1));
+		// Konfiguracja sygnału dla timera
 	sa1.sa_handler = &timer_handler;
 
 	if (sigaction (SIGVTALRM, &sa1, NULL) == -1)

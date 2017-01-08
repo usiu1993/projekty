@@ -1,0 +1,24 @@
+#!/bin/bash
+# Program tworzy 2 kolejki Fifo, do których wysyła stemple czasowe.
+# Prezentowane jest standardowe wyjscie jednego z odbiorców,
+# który co 6 sekund generuje komunikat, że nadal istnieje.  
+
+fifo1="/tmp/a4"
+fifo2="/tmp/a6"
+
+mkfifo $fifo1
+mkfifo $fifo2
+
+gcc -Wall -o datownik datownik.c -lrt
+gcc -Wall -o odbiornik odbiornik.c
+
+./odbiornik $fifo1 >/dev/null &
+
+
+./odbiornik -d6 $fifo2 &
+
+sleep 1
+./datownik -m3 -d0.5 -p10 -f$fifo1 -f$fifo2 &&
+
+sleep 2
+exit

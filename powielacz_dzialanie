@@ -1,0 +1,34 @@
+#!/bin/bash
+# Program powielacza sprawdza czy wygenerowane przez niego
+# nazwy są kolejkami fifo oraz czy są otwarte do pisania 
+# Tworzonych jest 2 odbiorców, wysyłających otrzymane dane do pliku. 
+# W ścieżce podanej do powielacza z parametrem -L gromadzone są informacje diagnostyczne.
+
+fifo1="/tmp/c1"
+fifo2="/tmp/c4"
+fifo3="/tmp/c5"
+fifo="/tmp/c"
+diag="diag.txt"
+dir=wyniki_powielacz
+
+mkfifo $fifo1
+mkfifo $fifo2
+mkfifo $fifo3
+mkdir $dir
+
+gcc -Wall -o datownik datownik.c -lrt
+gcc -Wall -o odbiornik odbiornik.c
+gcc -Wall -o powielacz powielacz.c
+
+./odbiornik "/tmp/c1" > $dir/w1.txt 2>&1 &
+
+./odbiornik "/tmp/c4" > $dir/w4.txt 2>&1 &
+pid1=$!
+disown $pid1
+
+./datownik -m1 -d0.5 -w7 -s1 | ./powielacz -p$fifo -c7 -L$diag &
+sleep 3
+kill -9 $pid1 &
+echo "Koniec dzialania skryptu"
+sleep 1
+exit

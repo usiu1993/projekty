@@ -60,12 +60,10 @@ void term(int signum)
 int main(int argc, char *argv[])
 {	char** abstract_server;
 
-	struct sigaction action;
-    memset(&action, 0, sizeof(struct sigaction));
-    action.sa_handler = term;
-    sigaction(SIGINT, &action, NULL);
+	
  
-
+	char* str=malloc(20);
+	char* napis = "viper_serv";
 
    struct sockaddr_un svaddr[10], claddr[10];
    int* sfd=malloc(10*sizeof(sfd));
@@ -73,17 +71,21 @@ int main(int argc, char *argv[])
    socklen_t len;
    int count=0;
    
-   for(int i=0;i<2;i++)
+   for(int i=0;i<4;i++)
    {
    
    abstract_server= malloc(10*sizeof(*abstract_server));
    abstract_server[i] = malloc(sizeof *abstract_server[i] * 20);
-	
-	if(i==0)
+	snprintf(str,15,"%s%d",napis,i);
+	printf("%s\n",str);
+	abstract_server[i]=str;
+	/*if(i==0)
 		strcpy(abstract_server[i],"viper_server2");
 	if(i==1)
 		strcpy(abstract_server[i],"viper_server21");
-
+	*/
+	
+	
    sfd[i] = socket(AF_UNIX, SOCK_DGRAM, 0);       /* Create server socket */
    if (sfd[i] == -1)
        printf("socket prob\n");
@@ -110,10 +112,10 @@ int main(int argc, char *argv[])
    buf[i]=malloc(sizeof*buf[i]*BUF_SIZE);
 }
 
-   while (!done) {
+   while (1) {
 	   
 	   
-	   for(int i=1;i>=0;i--)
+	   for(int i=4;i>=0;i--)
 	    {
 			
 			//abstract_server= malloc(10*sizeof(*abstract_server));

@@ -17,18 +17,31 @@ char buffer1[255];
 int Ppid;
 long iterator=0;
 int *sfd;
+char* wiadomosc;
+char c;
+int fd,rc;
+char buf3[5];
 
 void komunikat(int sig) {
 	//pipe(fpipe);
-//printf("JEST w SIGU\n");	
-	FILE *fileptr= fopen("plik.txt", "rb");
+//printf("JEST w SIGU\n");
+		wiadomosc="basia";
+		int dl=strlen(wiadomosc);
+		strcpy(buf3,"stop");
+	//FILE *fileptr= fopen("plik.txt", "rb");
 if(getpid()==Ppid){
-			fseek(fileptr,iterator-1, SEEK_SET);
-			fread(buffer1, 1, 1, fileptr);  	
+			//fseek(fileptr,iterator-1, SEEK_SET);
+			//fread(buffer1, 1, 1, fileptr);
+			c=wiadomosc[iterator];
+			snprintf(buffer1,sizeof(buffer1),"%c",c); 	
 			printf("buff %s\n",buffer1);
 			write(fpipe[1], buffer1, 1);
 			iterator++;
-		
+			if(iterator==dl)
+				{
+				write(fd, buf3, rc);
+				exit(1);
+				}
 
 	}
 	alarm(3);       
@@ -40,6 +53,55 @@ if(getpid()==Ppid){
 
 int main(int argc, char *argv[])
 {
+//=======================================================
+//======================================================
+struct sockaddr_un addr;
+  char buf[100];
+  
+  int start=0;
+char* socket_path;
+  if (argc > 1) socket_path=argv[1];
+
+  if ( (fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+    perror("socket error");
+    exit(-1);
+  }
+
+  memset(&addr, 0, sizeof(addr));
+  addr.sun_family = AF_UNIX;
+  
+  strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path)-1);
+
+  if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
+    perror("connect error");
+    exit(-1);
+  }
+
+  while( (rc=read(STDIN_FILENO, buf, sizeof(buf))) > 0) {
+    if (write(fd, buf, rc) == rc) {
+		//close(fd);
+		break;
+	}
+	else{	
+      if (rc > 0) fprintf(stderr,"partial write");
+      else {
+        perror("write error");
+        exit(-1);
+      }
+    }
+}
+
+
+sleep(3);
+
+start=1;
+
+
+if(start)
+{
+
+//=======================================================
+//=======================================================
     //struct sockaddr_un svaddr, claddr;
     //int sfd, j;
     struct sockaddr_un svaddr[10], claddr[10];
@@ -181,7 +243,10 @@ while(1){
     
 }
 }
-    //remove(claddr[i].sun_path);            /* Remove client socket pathname */
+    //remove(claddr[i].sun_path); 
+    
+	}
+               /* Remove client socket pathname */
     exit(EXIT_SUCCESS);
 }
 

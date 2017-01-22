@@ -36,7 +36,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <string.h>
-
+ #include <fcntl.h>
 #include <errno.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -59,9 +59,70 @@ void term(int signum)
 
 int main(int argc, char *argv[])
 {	char** abstract_server;
+//----------------------------------------------------------
+//----------------------------------------------------------
+  struct sockaddr_un addr;
+  char buf1[100];
+  int fd,cl,rc,rc1;
+	int start =0;
+	char bufEnd[5];
+	char* socket_path;
+  if (argc > 1) socket_path=argv[1];
 
+  if ( (fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+    perror("socket error");
+    exit(-1);
+  }
+
+  memset(&addr, 0, sizeof(addr));
+  addr.sun_family = AF_UNIX;
+
+    strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path)-1);
+    unlink(socket_path);
+  
+
+  if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
+    perror("bind error");
+    exit(-1);
+  }
+
+  if (listen(fd, 5) == -1) {
+    perror("listen error");
+    exit(-1);
+  }
+
+  while (1) {
+    if ( (cl = accept(fd, NULL, NULL)) == -1) {
+      perror("accept error");
+      continue;
+    }
+	printf("Podaj ID brygady:\n");
+    if ( (rc=read(cl,buf1,sizeof(buf1))) > 0) {
+      printf("Zarejestrowano brygade: %s\n", buf1);
+      //close(cl);
+      //close(fd);
+      break;
+    }
+    if (rc == -1) {
+      perror("read");
+      exit(-1);
+    }
+    else if (rc == 0) {
+      printf("EOF\n");
+      close(cl);
+    }
+  }
+
+
+   
+    printf("jestem juz po a wiadomosc to %s\n",buf1);
+    
+    start=1;
 	
- 
+ //--------------------------------------------------------------
+ //--------------------------------------------------------------
+	
+	if(start){
 	char* str=malloc(20);
 	char* napis = "viper_serv";
 
@@ -118,15 +179,7 @@ int main(int argc, char *argv[])
 	   for(int i=4;i>=0;i--)
 	    {
 			
-			//abstract_server= malloc(10*sizeof(*abstract_server));
-			//abstract_server[i] = malloc(sizeof *abstract_server[i] * 20);
-	
-			//	if(i==0)
-				//	strcpy(abstract_server[i],"viper_server21");
-				//if(i==1)
-					//strcpy(abstract_server[i],"viper_server2");
 			
-	   //printf("jest tu %s\n",abstract_server[i]);
        len = sizeof(struct sockaddr_un);
        numBytes = recvfrom(sfd[i], buf[i], BUF_SIZE, MSG_DONTWAIT ,
                            (struct sockaddr *) &claddr[i], &len);
@@ -146,15 +199,31 @@ int main(int argc, char *argv[])
 		printf("Server received %s", buf[i]);
 		
 		}
-		
-		//for(int i=0;i<count;i++)
-		//printf("---->\n%s\n<-------",array[i]);
+			int flags = fcntl(cl, F_GETFL, 0);
+			fcntl(cl, F_SETFL, flags | O_NONBLOCK);
+		if ( (rc1=read(cl,bufEnd,sizeof(bufEnd))) > 0)
+		{
+			printf("koniec\n");
+			close(cl);
+			for(int i=0;i<4;i++)
+				{
+					
+				close(sfd[i]);	
+					
+				}
+					for(int i=0;i<=count;i++)
+			printf("%s",array[i]);	
+				
+			//exit(1);
+		}
+
 		
       // for (j = 0; j < numBytes; j++)
       // buf[j] = toupper((unsigned char) buf[j]);
 
 		}
      }
-     
-     
+     printf("powinien byc tu\n");
+ }
+ return 0;
  }

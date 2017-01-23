@@ -1,34 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <time.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <string.h>
-
-#include <errno.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-//#define BUF_SIZE 100
-
-
-//int main(int argc, char *argv[])
-//{
-	/*	int* sfd=malloc(10*sizeof(sfd));
-	ssize_t numBytes;
-	
-	//struct sockaddr_un *svaddr, *claddr;
-	char **abstract_server;
-	char **buf;
-	buf=malloc(10*sizeof(*buf));
-	//buf[0]=malloc(sizeof*buf[0]*BUF_SIZE);
-	abstract_server= malloc(10*sizeof(*abstract_server));
-	abstract_server[0] = malloc(sizeof *abstract_server[0] * 20);
-	strcpy(abstract_server[0],"viper_server1");
-	strcpy(abstract_server[1],"viper_server2");
-	*/
-//for(int i=0;i<1;i++)	
-//{	
+#include <openssl/sha.h>	
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -39,9 +9,11 @@
  #include <fcntl.h>
 #include <errno.h>
 #include <sys/socket.h>
+#include <openssl/md5.h>
 #include <sys/un.h>
 #define BUF_SIZE 40
-	
+#define ilRob 5	
+#define SHA_DIGEST_LENGTH 20
 	ssize_t numBytes;
 	
 	//struct sockaddr_un *svaddr, *claddr;
@@ -51,21 +23,80 @@
 	//
 
 volatile sig_atomic_t done = 0;
+
+
+ char* f1(char* data,size_t len)
+{	 char* out=malloc(30*sizeof(char));
+	 char* output = malloc(20*sizeof(char));
+	unsigned char hash[SHA_DIGEST_LENGTH];
+	SHA1((unsigned char*)data, len, hash);
+  
+   for(int i=0;i<SHA_DIGEST_LENGTH;i++){
+
+      // printf("%02x", hash[i]);
+        sprintf(output,"%02x",hash[i]);
+        strcat(out,output);
+    }
+    
+    //printf("%s\n",out);
+	return out;
+	
+	}
+
  
-void term(int signum)
+ int porownanie (char **str1, char **str2)
 {
-    done = 1;
+  return strcmp(*(str1)+13,*(str2)+13);
 }
+
+ 
+void Sortuj(char ** tablica,int rozmiar)
+{
+	
+	qsort (tablica,rozmiar,sizeof(char *),
+                    (int (*)(const void *, const void *)) porownanie);
+                    
+  // now display the sorted array
+	for (int i=0; i < rozmiar; i++) 
+		printf("%s \n",tablica[i]);	
+}
+
+/*char *str2md5(const char *str, int length) {
+//    char *str2md5(const char *str, int length) {
+
+
+unsigned char hash[SHA_DIGEST_LENGTH];
+SHA1((unsigned char*)str, length, hash);
+  
+   for(int i=0;i<SHA_DIGEST_LENGTH;i++){
+
+        printf("%02x", hash[i]);
+    }
+  //memset(data, 0, strlen(str));
+
+
+
+}*/
+
 
 int main(int argc, char *argv[])
 {	char** abstract_server;
+	
+	
+	/*char datas[5] = "basdt";
+size_t length = strlen(datas);
+	char *a=malloc(30);
+	 a=f1(datas,length);
+	 printf("%s",a);*/
 //----------------------------------------------------------
 //----------------------------------------------------------
   struct sockaddr_un addr;
+  
+  
   char buf1[100];
   int fd,cl,rc,rc1;
 	int start =0;
-	char bufEnd[5];
+	char* bufEnd=malloc(128*sizeof(bufEnd));
 	char* socket_path;
   if (argc > 1) socket_path=argv[1];
 
@@ -125,14 +156,14 @@ int main(int argc, char *argv[])
 	if(start){
 	char* str=malloc(20);
 	char* napis = "viper_serv";
-
+	char* sumak;
    struct sockaddr_un svaddr[10], claddr[10];
    int* sfd=malloc(10*sizeof(sfd));
    buf=malloc(10*sizeof(*buf));
    socklen_t len;
    int count=0;
    
-   for(int i=0;i<4;i++)
+   for(int i=0;i<ilRob;i++)
    {
    
    abstract_server= malloc(10*sizeof(*abstract_server));
@@ -176,7 +207,7 @@ int main(int argc, char *argv[])
    while (1) {
 	   
 	   
-	   for(int i=4;i>=0;i--)
+	   for(int i=ilRob;i>=0;i--)
 	    {
 			
 			
@@ -196,24 +227,52 @@ int main(int argc, char *argv[])
 		array = (char**)realloc(array, (count+1)*sizeof(*array));
 		array[count-1] = (char*)malloc(40);
 		strcpy(array[count-1], buf[i]);
-		printf("Server received %s", buf[i]);
-		
+		printf("Server received %s", buf[i]);		
 		}
 			int flags = fcntl(cl, F_GETFL, 0);
 			fcntl(cl, F_SETFL, flags | O_NONBLOCK);
-		if ( (rc1=read(cl,bufEnd,sizeof(bufEnd))) > 0)
+		if ( (rc1=read(cl,bufEnd,40)) > 0)
 		{
-			printf("koniec\n");
+			printf("suma: %s\n",bufEnd);
+			
 			close(cl);
-			for(int i=0;i<4;i++)
+			for(int i=0;i<ilRob;i++)
 				{
 					
 				close(sfd[i]);	
 					
 				}
-					for(int i=0;i<=count;i++)
+					for(int i=0;i<=count;i++)					
 			printf("%s",array[i]);	
-				
+			
+			Sortuj(array,count);
+			//char *str2 = malloc(count*sizeof(char));
+			//char* c=malloc(1*sizeof(char));
+					
+		char* c1=malloc(20*sizeof(char));
+		char* z=malloc(1*sizeof(char));
+		char* cal=malloc(5);
+
+	for(int i=0;i<count;i++){
+		sprintf(c1,"%c",*array[i]);
+		sprintf(z,"%c",c1[0]);
+		strcat(cal,z);
+	}
+	char *b=malloc(40);
+			b=f1(cal,strlen(cal));
+	if(strcmp(b,bufEnd)==0)
+		printf("SHA DZiALA\n");
+			
+			
+	printf("cal to %s\n",cal);
+	
+	
+	//printf("%s",bufEnd);
+	
+	//char *output = str2md5(cal, sizeof(cal));
+  //      printf("%s\n", output);
+	//	printf("%s\n",bufEnd);	
+			//printf("MAM STRING %s\n",str2);
 			//exit(1);
 		}
 

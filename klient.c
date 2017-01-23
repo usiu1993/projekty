@@ -10,8 +10,13 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <openssl/md5.h>
-#define ilRob 4
+#include <assert.h>
+#define ilRob 150
+#define SEND_STRLEN 11
 #define BUF_SIZE 100
+#define NAME_LEN 30
+#define DL_WIAD 40
+#define DL_NAZWY 35
 #define SHA_DIGEST_LENGTH 20
 struct timespec czasProc;
 int fpipe[2];
@@ -22,8 +27,10 @@ long iterator=0;
 int *sfd;
 char* wiadomosc;
 char c;
-int fd,rc;
+int fd,ilBajt;
 char buf3[5];
+int done=0;
+
 
  char* f1(char* data,size_t len)
 {	 char* out=malloc(30*sizeof(char));
@@ -43,14 +50,18 @@ char buf3[5];
 	
 	}
 
-
+void sigquit_handler (int sig) {
+    assert(sig == SIGQUIT);
+    pid_t self = getpid();
+    if (pidRodzica != self) _exit(0);
+}
 
 
 
 void sygnWys(int sig) {
 		//unsigned char result[10];
-		wiadomosc="ajprld";
-		
+		wiadomosc="sak";
+		int al=2;
 		
 		//char data[5] = "basdt";
 size_t length = strlen(wiadomosc);
@@ -72,13 +83,16 @@ if(getpid()==pidRodzica){
 			if(iterator==dlugosc)
 				{
 //				str2md5(wiadomosc, dlugosc);
-				printf("%s\n",a);
+				//printf("%s\n",a);
 				write(fd, a, 40);
-				exit(1);
+				//exit(1);
+				al=0;
+				sleep(3);
+				done=1;
 				}
 
 	}
-	alarm(3);       
+	alarm(al);       
 	signal(SIGALRM, sygnWys);
 }
 
@@ -87,74 +101,63 @@ if(getpid()==pidRodzica){
 
 int main(int argc, char *argv[])
 {
-	//char datas[5] = "japrld";
-/*size_t length = strlen(datas);
-	char *a=malloc(30);
-	 a=f1(datas,length);
-	 printf("%s",a);
-	*/
-//=======================================================
-//======================================================
-struct sockaddr_un addr;
+	struct sockaddr_un adres;
   char buf[100];
-  
- //char* a="basdt";
-//		char *output1 = str2md5(a, sizeof(a));
-    //    printf("%s\n", output1);
- 
- 
-  
+char* nazwaKan=malloc(DL_NAZWY*sizeof(char));
+char* nazwaKanKl=malloc(DL_NAZWY*sizeof(char));
+char* idSerw =malloc(NAME_LEN*sizeof(char));
+char* idKli =malloc(NAME_LEN*sizeof(char)); 
+char* otrzym=malloc(1*sizeof(char));
+ char** kanalKlient;
+    char** kanalPryw;
   int start=0;
+  int bajtPipe;
 char* socket_path;
   if (argc > 1) socket_path=argv[1];
+
+
+
 
   if ( (fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
     perror("socket error");
     exit(-1);
   }
 
-  memset(&addr, 0, sizeof(addr));
-  addr.sun_family = AF_UNIX;
+  memset(&adres, 0, sizeof(adres));
+  adres.sun_family = AF_UNIX;
   
-  strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path)-1);
+  strncpy(adres.sun_path, socket_path, sizeof(adres.sun_path)-1);
 
-  if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
+  if (connect(fd, (struct sockaddr*)&adres, sizeof(adres)) == -1) {
     perror("connect error");
     exit(-1);
   }
-
-  while( (rc=read(STDIN_FILENO, buf, sizeof(buf))) > 0) {
-    if (write(fd, buf, rc) == rc) {
-		//close(fd);
+  while( (ilBajt=read(STDIN_FILENO, buf, sizeof(buf))) > 0) {
+	 
+    if (write(fd, buf, ilBajt) == ilBajt) {
 		break;
 	}
 	else{	
-      if (rc > 0) fprintf(stderr,"partial write");
-      else {
         perror("write error");
         exit(-1);
-      }
     }
 }
 
 
-sleep(3);
+sleep(2);
 
 start=1;
 
 
 if(start)
 {
-
-//=======================================================
-//=======================================================
-    struct sockaddr_un adrSerw[10], adrKli[10];
-	sfd=malloc(10*sizeof(sfd));
-	char* str=malloc(20);
-	char* str2=malloc(20);
-	char* idSerw = "viper_serv";
-	char* idKli = "viper_clint";
+	signal(SIGQUIT, sigquit_handler);
 	
+    struct sockaddr_un adrSerw[ilRob], adrKli[ilRob];
+	sfd=malloc(ilRob*sizeof(sfd));
+
+	idSerw="viper_serv";
+	idKli="viper_clint";
     pidRodzica=getpid();
 	printf("parent pid :%d\n",pidRodzica);
 	 
@@ -164,98 +167,126 @@ if(start)
 	signal(SIGALRM, sygnWys);
 	alarm(2);
 	
-    char** abstract_client;
-    char** abstract_server;
+   
 
     /* Create client socket; bind to unique pathname (based on PID) */
 
 for(int i=0;i<ilRob;i++){
     sfd[i] = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (sfd[i] == -1)
-        printf("sock prob\n");
-    else
-		printf("zrobiono socket %d\n",i);
+       perror("socket error");
+   // else
+		//printf("zrobiono socket %d\n",i);
         
-    abstract_server= malloc(10*sizeof(*abstract_server));
-    abstract_server[i] = malloc(sizeof *abstract_server[i] * 20);   
-	snprintf(str,15,"%s%d",idSerw,i);
-	abstract_server[i]=str;
-	printf("%s",abstract_server[i]);
-	abstract_client= malloc(10*sizeof(*abstract_client));
-    abstract_client[i] = malloc(sizeof *abstract_client[i] * 20);   
-	snprintf(str2,15,"%s%d",idKli,i);
-	abstract_client[i]=str2;
-	printf("%s\n",abstract_client[i]);
-	printf("dl %d %lu\n",i,strlen(abstract_server[i]));
-   
+    kanalPryw= malloc(ilRob*sizeof(*kanalPryw));
+    kanalPryw[i] = malloc(sizeof *kanalPryw[i] * DL_NAZWY);   
+	snprintf(nazwaKan,DL_NAZWY,"%s%d",idSerw,i);
+	kanalPryw[i]=nazwaKan;
+	printf("%s",kanalPryw[i]);
+	kanalKlient= malloc(ilRob*sizeof(*kanalKlient));
+    kanalKlient[i] = malloc(sizeof *kanalKlient[i] * DL_NAZWY);   
+	snprintf(nazwaKanKl,DL_NAZWY,"%s%d",idKli,i);
+	kanalKlient[i]=nazwaKanKl;
+	printf("%s\n",kanalKlient[i]);
     memset(&adrKli[i], 0, sizeof(struct sockaddr_un));
     adrKli[i].sun_family = AF_UNIX;
-    strncpy(&adrKli[i].sun_path[1], abstract_client[i], strlen(abstract_client[i])); 
+    strncpy(&adrKli[i].sun_path[1], kanalKlient[i], strlen(kanalKlient[i])); 
 
     if (bind(sfd[i], (struct sockaddr *) &adrKli[i], 
-      sizeof(sa_family_t) + strlen(abstract_client[i]) + 1) == -1)
-        printf("bind prob\n");
-    else
-		printf("zbindowany %s\n",abstract_server[i]);
+      sizeof(sa_family_t) + strlen(kanalKlient[i]) + 1) == -1)
+        perror("binding error");
+  //  else
+		//printf("zbindowany %s\n",kanalPryw[i]);
 
     /* Construct address of server */
 
     memset(&adrSerw[i], 0, sizeof(struct sockaddr_un));
     adrSerw[i].sun_family = AF_UNIX;
-    strncpy(&adrSerw[i].sun_path[1], abstract_server[i], strlen(abstract_server[i]));
+    strncpy(&adrSerw[i].sun_path[1], kanalPryw[i], strlen(kanalPryw[i]));
 }
 		for(int i = 0; i<ilRob; i++) {
     pid = fork();
     if(pid < 0) {
-        printf("Error");
-        exit(1);
+        perror("fork error");
+        exit(-1);
     } else if (pid == 0) {
-        printf("Child (%d): %d\n", i + 1, getpid());
+        printf("Robottnik (%d): %d\n", i + 1, getpid());
         break; 
-    } else  {
-       //wait(NULL);
-    }
+    }  
 }
 
     /* Send messages to server; echo responses on stdout */
-while(1){
-		
+while(!done){		
 	 if(getpid()!=pidRodzica){ 
-		 
-		printf("jest tu %d\n",getpid());
-		sleep(2); 
-		 
 		struct timespec spi;
 		spi.tv_sec=0;
-		spi.tv_nsec=5000;
+		spi.tv_nsec=1000000;
 	
         close(fpipe[1]);
-        char ot[2];
+
         //int wys;
         // now read the data (will block) tu bylo 1 
-        if(read(fpipe[0], ot,1)==0)
+        bajtPipe=read(fpipe[0], otrzym,1);
+        if(bajtPipe==0)
 			break;
-        printf("mam od %s\n",ot);
+		else if(bajtPipe==-1)
+		{
+		perror("read from pipe error");
+        exit(-1);
+			}
         nanosleep(&spi,NULL); 
         clock_gettime(CLOCK_REALTIME, &czasProc);
-        snprintf(datagram, 40, "%s |sec:%ld, nsec:%ld\n",ot,czasProc.tv_sec,czasProc.tv_nsec);
-        printf("Child(%d) received value: %s\n", getpid(), ot);
+        snprintf(datagram, DL_WIAD, "%s |sec:%ld, nsec:%ld\n",otrzym,czasProc.tv_sec,czasProc.tv_nsec);
+        printf("Robotnik(%d) received value: %s\n", getpid(), otrzym);
 			 int wys=getpid()-pidRodzica-1;
-
-		printf("jest tu\n");
-       if (sendto(sfd[wys], datagram, 40, 0, (struct sockaddr *) &adrSerw[wys],
-                 (sizeof(sa_family_t) + 11 + 1) ) != 40) 
+			 
+       if (sendto(sfd[wys], datagram, DL_WIAD, 0, (struct sockaddr *) &adrSerw[wys],
+                 (sizeof(sa_family_t) + SEND_STRLEN + 1) ) != DL_WIAD) 
               perror("sendto");
        else{
 			printf("wyslal %d zawodnik\n",wys);
 		}
 	
-    memset(ot,0,1);
+    memset(otrzym,0,1);
     
 }
 }
     
 	}
+	
+	
+    kill(-pidRodzica, SIGQUIT);
+    for (int i = 0; i < ilRob-1; ++i) {
+        int status;
+        while (1) {
+            pid_t child = wait(&status);
+            if (child > 0 && WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+                printf("Robotnik %d zakończyl prace\n", (int)child);
+            } else if (child < 0 && errno == EINTR) {
+                continue;
+            } else {
+                break;
+            }
+		}
+	}
+	//PAMIEC
+	
+	printf("jest tu\n");
+ 	for(int k=0;k<ilRob;k++)
+ 	{
+		free(kanalPryw[k]);
+	free(kanalKlient[k]);
+	}
+	free(kanalPryw);
+	free(kanalKlient);
+	
+	free(nazwaKan);
+	free(nazwaKanKl);
+	//free(idSerw);
+	//free(idKli);
+	free(otrzym);
+	
+	printf("zwolnil\n");
                /* Remove client socket pathname */
     exit(EXIT_SUCCESS);
 }

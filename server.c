@@ -11,35 +11,37 @@
 #include <sys/socket.h>
 #include <openssl/md5.h>
 #include <sys/un.h>
-#define BUF_SIZE 40
-#define ilRob 5	
+#define DL_WIAD 40
+#define CH_SUM 40
+#define ilRob 150	
+#define NAME_LEN 30
+#define DL_NAZWY 35
 #define SHA_DIGEST_LENGTH 20
-	ssize_t numBytes;
-	
-	//struct sockaddr_un *svaddr, *claddr;
-	char **abstract_server;
-	char **buf;
-	char **array = NULL;
-	//
+	ssize_t bajtOdebr;
+
+	char **wiadomosc;
+	char **otrzymDat;
+
 
 volatile sig_atomic_t done = 0;
 
 
- char* f1(char* data,size_t len)
-{	 char* out=malloc(30*sizeof(char));
-	 char* output = malloc(20*sizeof(char));
+ char* sumaKontr(char* data,size_t len)
+{	//char* out=malloc(30*sizeof(char));
+	//char* output = malloc(20*sizeof(char));
+	char* suma=malloc(CH_SUM*sizeof(char));
+	char* pojHash = malloc(20*sizeof(char));
 	unsigned char hash[SHA_DIGEST_LENGTH];
 	SHA1((unsigned char*)data, len, hash);
   
    for(int i=0;i<SHA_DIGEST_LENGTH;i++){
-
-      // printf("%02x", hash[i]);
-        sprintf(output,"%02x",hash[i]);
-        strcat(out,output);
+        sprintf(pojHash,"%02x",hash[i]);
+        strcat(suma,pojHash);
     }
     
-    //printf("%s\n",out);
-	return out;
+   
+    free(pojHash);
+	return suma;
 	
 	}
 
@@ -57,47 +59,30 @@ void Sortuj(char ** tablica,int rozmiar)
                     (int (*)(const void *, const void *)) porownanie);
                     
   // now display the sorted array
-	for (int i=0; i < rozmiar; i++) 
-		printf("%s \n",tablica[i]);	
+	//for (int i=0; i < rozmiar; i++) 
+	//	printf("%s \n",tablica[i]);	
 }
-
-/*char *str2md5(const char *str, int length) {
-//    char *str2md5(const char *str, int length) {
-
-
-unsigned char hash[SHA_DIGEST_LENGTH];
-SHA1((unsigned char*)str, length, hash);
-  
-   for(int i=0;i<SHA_DIGEST_LENGTH;i++){
-
-        printf("%02x", hash[i]);
-    }
-  //memset(data, 0, strlen(str));
-
-
-
-}*/
 
 
 int main(int argc, char *argv[])
-{	char** abstract_server;
-	
-	
-	/*char datas[5] = "basdt";
-size_t length = strlen(datas);
-	char *a=malloc(30);
-	 a=f1(datas,length);
-	 printf("%s",a);*/
+{	
+	char** kanalPryw;
 //----------------------------------------------------------
 //----------------------------------------------------------
-  struct sockaddr_un addr;
+  struct sockaddr_un adres;
   
   
-  char buf1[100];
-  int fd,cl,rc,rc1;
-	int start =0;
-	char* bufEnd=malloc(128*sizeof(bufEnd));
+  char* kanalRej=malloc(NAME_LEN*sizeof(char));
+  int fd,brygFd,bajtCzyt,bajtCzyt2;
+	int datagram =0;
+	char* otrzymSH1=malloc(CH_SUM*sizeof(otrzymSH1));
+	char* tablica=malloc(DL_WIAD*sizeof(char));
+	char* wysBajt=malloc(1*sizeof(char));
+	char* odebrWiad=malloc(DL_WIAD*sizeof(char));
+	char* nazwKan=malloc(DL_NAZWY*sizeof(char));
+	int* sfd=malloc(ilRob*sizeof(sfd));
 	char* socket_path;
+	int ilosc=0;
   if (argc > 1) socket_path=argv[1];
 
   if ( (fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
@@ -105,14 +90,14 @@ size_t length = strlen(datas);
     exit(-1);
   }
 
-  memset(&addr, 0, sizeof(addr));
-  addr.sun_family = AF_UNIX;
+  memset(&adres, 0, sizeof(adres));
+  adres.sun_family = AF_UNIX;
 
-    strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path)-1);
+    strncpy(adres.sun_path, socket_path, sizeof(adres.sun_path)-1);
     unlink(socket_path);
   
 
-  if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
+  if (bind(fd, (struct sockaddr*)&adres, sizeof(adres)) == -1) {
     perror("bind error");
     exit(-1);
   }
@@ -123,166 +108,172 @@ size_t length = strlen(datas);
   }
 
   while (1) {
-    if ( (cl = accept(fd, NULL, NULL)) == -1) {
+    if ( (brygFd = accept(fd, NULL, NULL)) == -1) {
       perror("accept error");
-      continue;
+      //continue;
+       exit(-1);
     }
 	printf("Podaj ID brygady:\n");
-    if ( (rc=read(cl,buf1,sizeof(buf1))) > 0) {
-      printf("Zarejestrowano brygade: %s\n", buf1);
-      //close(cl);
-      //close(fd);
+    if ( (bajtCzyt=read(brygFd,kanalRej,sizeof(kanalRej))) > 0) {
+      printf("Zarejestrowano brygade: %s\n", kanalRej);
       break;
     }
-    if (rc == -1) {
-      perror("read");
+    if (bajtCzyt == -1) {
+      perror("read error");
       exit(-1);
     }
-    else if (rc == 0) {
+    else if (bajtCzyt == 0) {
       printf("EOF\n");
-      close(cl);
+      close(brygFd);
     }
   }
-
-
-   
-    printf("jestem juz po a wiadomosc to %s\n",buf1);
     
-    start=1;
+    datagram=1;
 	
  //--------------------------------------------------------------
  //--------------------------------------------------------------
 	
-	if(start){
-	char* str=malloc(20);
+	if(datagram){
+	
 	char* napis = "viper_serv";
-	char* sumak;
-   struct sockaddr_un svaddr[10], claddr[10];
-   int* sfd=malloc(10*sizeof(sfd));
-   buf=malloc(10*sizeof(*buf));
+   struct sockaddr_un svaddr[ilRob], claddr[ilRob];
+   
+   wiadomosc=malloc(ilRob*sizeof(*wiadomosc));
    socklen_t len;
-   int count=0;
+   
    
    for(int i=0;i<ilRob;i++)
    {
    
-   abstract_server= malloc(10*sizeof(*abstract_server));
-   abstract_server[i] = malloc(sizeof *abstract_server[i] * 20);
-	snprintf(str,15,"%s%d",napis,i);
-	printf("%s\n",str);
-	abstract_server[i]=str;
-	/*if(i==0)
-		strcpy(abstract_server[i],"viper_server2");
-	if(i==1)
-		strcpy(abstract_server[i],"viper_server21");
-	*/
+   kanalPryw= malloc(ilRob*sizeof(*kanalPryw));
+   kanalPryw[i] = malloc(sizeof *kanalPryw[i] * DL_NAZWY);
+	snprintf(nazwKan,DL_NAZWY,"%s%d",napis,i);
+	printf("%s\n",nazwKan);
+	kanalPryw[i]=nazwKan;
+
 	
 	
    sfd[i] = socket(AF_UNIX, SOCK_DGRAM, 0);       /* Create server socket */
    if (sfd[i] == -1)
-       printf("socket prob\n");
+      perror("creating socket error ");
+			
+	
 
+	printf("abstract %s\n",kanalPryw[i]);
 
-	printf("abstract %s\n",abstract_server[i]);
-//   abstract_server[0] = "viper_server2";
    /* Construct well-known address and bind server socket to it */
 
-   if (remove(abstract_server[i]) == -1 && errno != ENOENT)
-       printf("remove prob\n");  
+   if (remove(kanalPryw[i]) == -1 && errno != ENOENT)
+        {
+	 perror("remove error ");
+      exit(-1);
+	}
 
    memset(&svaddr[i], 0, sizeof(struct sockaddr_un));
    svaddr[i].sun_family = AF_UNIX;
-   strncpy(&svaddr[i].sun_path[1], abstract_server[i], strlen(abstract_server[i]));
+   strncpy(&svaddr[i].sun_path[1], kanalPryw[i], strlen(kanalPryw[i]));
 
    if (bind(sfd[i], (struct sockaddr *) &svaddr[i], 
-     sizeof(sa_family_t) + strlen(abstract_server[i]) + 1) == -1)
-       printf("bind prob\n");
-   else
-		printf("zbindowano");
+     sizeof(sa_family_t) + strlen(kanalPryw[i]) + 1) == -1)
+       {
+			perror("binding error ");
+			exit(-1);
+		   }
+
 
    /* Receive messages, convert to uppercase, and return to client */
-   buf[i]=malloc(sizeof*buf[i]*BUF_SIZE);
+   wiadomosc[i]=malloc(sizeof*wiadomosc[i]*DL_WIAD);
 }
 
-   while (1) {
+   while (!done) {
 	   
 	   
-	   for(int i=ilRob;i>=0;i--)
+	   for(int i=0;i<ilRob;i++)
 	    {
 			
 			
        len = sizeof(struct sockaddr_un);
-       numBytes = recvfrom(sfd[i], buf[i], BUF_SIZE, MSG_DONTWAIT ,
+       bajtOdebr = recvfrom(sfd[i], wiadomosc[i], DL_WIAD, MSG_DONTWAIT ,
                            (struct sockaddr *) &claddr[i], &len);
         
         //printf("bajty %ld\n",(long int)numBytes);                   
                            
-       if (numBytes <= 0)
+       if (bajtOdebr < 0)
        {	continue;
-           printf("recvfrom prob\n");
+           perror("recvfrom prob");
 	   }
-		if(numBytes>0)
+		if(bajtOdebr>0)
 		{
-		count++;
-		array = (char**)realloc(array, (count+1)*sizeof(*array));
-		array[count-1] = (char*)malloc(40);
-		strcpy(array[count-1], buf[i]);
-		printf("Server received %s", buf[i]);		
+		ilosc++;
+		otrzymDat = (char**)realloc(otrzymDat, (ilosc+1)*sizeof(*otrzymDat));
+		otrzymDat[ilosc-1] = (char*)malloc(40);
+		strcpy(otrzymDat[ilosc-1], wiadomosc[i]);
+		printf("Server received %s", wiadomosc[i]);		
 		}
-			int flags = fcntl(cl, F_GETFL, 0);
-			fcntl(cl, F_SETFL, flags | O_NONBLOCK);
-		if ( (rc1=read(cl,bufEnd,40)) > 0)
+			int flagi = fcntl(brygFd, F_GETFL, 0);
+			fcntl(brygFd, F_SETFL, flagi | O_NONBLOCK);
+		if ( (bajtCzyt2=read(brygFd,otrzymSH1,CH_SUM)) > 0)
 		{
-			printf("suma: %s\n",bufEnd);
+			printf("suma: %s\n",otrzymSH1);
 			
-			close(cl);
+			close(brygFd);
 			for(int i=0;i<ilRob;i++)
 				{
 					
 				close(sfd[i]);	
 					
 				}
-					for(int i=0;i<=count;i++)					
-			printf("%s",array[i]);	
+					//for(int i=0;i<ilosc;i++)					
+			//printf("%s",otrzymDat[i]);	
 			
-			Sortuj(array,count);
-			//char *str2 = malloc(count*sizeof(char));
-			//char* c=malloc(1*sizeof(char));
+			Sortuj(otrzymDat,ilosc);
 					
-		char* c1=malloc(20*sizeof(char));
-		char* z=malloc(1*sizeof(char));
-		char* cal=malloc(5);
 
-	for(int i=0;i<count;i++){
-		sprintf(c1,"%c",*array[i]);
-		sprintf(z,"%c",c1[0]);
-		strcat(cal,z);
+
+	for(int i=0;i<ilosc;i++){
+		sprintf(tablica,"%c",*otrzymDat[i]);
+		sprintf(wysBajt,"%c",tablica[0]);
+		strcat(odebrWiad,wysBajt);
 	}
-	char *b=malloc(40);
-			b=f1(cal,strlen(cal));
-	if(strcmp(b,bufEnd)==0)
-		printf("SHA DZiALA\n");
+	char *sumaSH1=malloc(CH_SUM*sizeof(char));
+			sumaSH1=sumaKontr(odebrWiad,strlen(odebrWiad));
+	if(strcmp(sumaSH1,otrzymSH1)==0)
+		printf("Sumy kontrolne sa zgodne.\n");
+	else
+		printf("Sumy kontrolne nie są zgodne.\n"
+		"Niepelna wiadomosc lub niepoprawna kolejnosc.");
 			
 			
-	printf("cal to %s\n",cal);
-	
-	
-	//printf("%s",bufEnd);
-	
-	//char *output = str2md5(cal, sizeof(cal));
-  //      printf("%s\n", output);
-	//	printf("%s\n",bufEnd);	
-			//printf("MAM STRING %s\n",str2);
-			//exit(1);
+	printf("Odebrna wiadomosc: %s\n",odebrWiad);
+		sleep(2);
+		done=1;
 		}
 
+		}
 		
-      // for (j = 0; j < numBytes; j++)
-      // buf[j] = toupper((unsigned char) buf[j]);
-
-		}
      }
-     printf("powinien byc tu\n");
  }
+ //PAMIEC
+ 	for(int k=0;k<ilRob;k++)
+ 	{
+		free(kanalPryw[k]);
+		free(wiadomosc[k]);
+	
+	}
+	for(int k=0;k<=ilosc;k++)
+		free(otrzymDat[k]);
+	
+	//free(kanalPryw);
+	//free(wiadomosc);
+	free(otrzymDat);
+	free(otrzymSH1);
+	free(kanalRej);
+	free(nazwKan);
+	free(sfd);
+	free(tablica);
+	free(wysBajt);
+	free(odebrWiad);
+	printf("zwolnil\n");
+ 
  return 0;
  }

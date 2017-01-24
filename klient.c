@@ -11,13 +11,16 @@
 #include <sys/un.h>
 #include <openssl/md5.h>
 #include <assert.h>
-#define ilRob 150
 #define SEND_STRLEN 11
 #define BUF_SIZE 100
 #define NAME_LEN 30
 #define DL_WIAD 40
 #define DL_NAZWY 35
 #define SHA_DIGEST_LENGTH 20
+
+#define SERVER_PATH "tpf_unix_sock.server1"
+#define CLIENT_PATH "tpf_unix_sock.client1"
+#define DATA "Hello from client"
 struct timespec czasProc;
 int fpipe[2];
 char datagram[40];
@@ -30,7 +33,7 @@ char c;
 int fd,ilBajt;
 char buf3[5];
 int done=0;
-
+int czasAl;
 
  char* f1(char* data,size_t len)
 {	 char* out=malloc(30*sizeof(char));
@@ -40,12 +43,10 @@ int done=0;
   
    for(int i=0;i<SHA_DIGEST_LENGTH;i++){
 
-      // printf("%02x", hash[i]);
         sprintf(output,"%02x",hash[i]);
         strcat(out,output);
     }
-    
-    //printf("%s\n",out);
+
 	return out;
 	
 	}
@@ -60,8 +61,8 @@ void sigquit_handler (int sig) {
 
 void sygnWys(int sig) {
 		//unsigned char result[10];
-		wiadomosc="sak";
-		int al=2;
+		//wiadomosc="sak";
+		//int al=2;
 		
 		//char data[5] = "basdt";
 size_t length = strlen(wiadomosc);
@@ -82,17 +83,14 @@ if(getpid()==pidRodzica){
 			iterator++;
 			if(iterator==dlugosc)
 				{
-//				str2md5(wiadomosc, dlugosc);
-				//printf("%s\n",a);
 				write(fd, a, 40);
-				//exit(1);
-				al=0;
+				czasAl=0;
 				sleep(3);
 				done=1;
 				}
 
 	}
-	alarm(al);       
+	alarm(czasAl);      
 	signal(SIGALRM, sygnWys);
 }
 
@@ -101,8 +99,9 @@ if(getpid()==pidRodzica){
 
 int main(int argc, char *argv[])
 {
-	struct sockaddr_un adres;
-  char buf[100];
+	struct sockaddr_un adres,adresP;
+  char buf[30];
+  char buf2[100];
 char* nazwaKan=malloc(DL_NAZWY*sizeof(char));
 char* nazwaKanKl=malloc(DL_NAZWY*sizeof(char));
 char* idSerw =malloc(NAME_LEN*sizeof(char));
@@ -111,9 +110,55 @@ char* otrzym=malloc(1*sizeof(char));
  char** kanalKlient;
     char** kanalPryw;
   int start=0;
+  char* ilRobStr=malloc(4*sizeof(char));
   int bajtPipe;
-char* socket_path;
-  if (argc > 1) socket_path=argv[1];
+  int ilRob;
+   int ilBajt2;
+   int fdP;
+  int opt;
+char* nazwaRej;
+  //if (argc > 1) socket_path=argv[1];
+if(argc<5)
+	{
+		printf("Argumenty wymagane: -m <kanal do rejestracji> -d <ilosc robotnikow>\n"
+		"-w <nazwa pliku .txt>/b -c <czas>\n");
+		exit(1);
+
+	}
+
+
+while ((opt = getopt(argc, argv, "m:d:w:c:")) != -1) 
+	{
+		switch (opt) 
+		{
+			case 'm':
+			//ADRES KANALU DO REJESTRACJI
+				nazwaRej=optarg;
+				break;
+			case 'd':
+				ilRobStr=optarg;
+				break;
+
+			case 'w':
+				wiadomosc=optarg;
+				break;		
+				
+			case 'c':
+				czasAl=atoi(optarg);
+				break;		
+					
+			default:
+				printf("Argumenty wymagane: -m <kanal do rejestracji> -d <ilosc robotnikow>\n"
+		"-w <nazwa pliku .txt>/b -c <czas>\n");
+				exit(1);
+		}
+
+
+	}
+
+
+
+
 
 
 
@@ -126,16 +171,21 @@ char* socket_path;
   memset(&adres, 0, sizeof(adres));
   adres.sun_family = AF_UNIX;
   
-  strncpy(adres.sun_path, socket_path, sizeof(adres.sun_path)-1);
+  strncpy(adres.sun_path, nazwaRej, sizeof(adres.sun_path)-1);
 
   if (connect(fd, (struct sockaddr*)&adres, sizeof(adres)) == -1) {
     perror("connect error");
     exit(-1);
   }
+  printf("Wpisz Id brygady\n");
   while( (ilBajt=read(STDIN_FILENO, buf, sizeof(buf))) > 0) {
 	 
-    if (write(fd, buf, ilBajt) == ilBajt) {
-		break;
+    if (write(fd, buf, 30) == 30) {
+		 //read(STDIN_FILENO, buf2, sizeof(buf2));
+				write(fd,ilRobStr,sizeof(ilRobStr));
+						
+					break;
+				
 	}
 	else{	
         perror("write error");
@@ -146,16 +196,96 @@ char* socket_path;
 
 sleep(2);
 
+
+ilRob=atoi(ilRobStr);
+
+
+
+//Prywatny 
+    int client_sock, rc, len;
+    struct sockaddr_un server_sockaddr; 
+    struct sockaddr_un client_sockaddr; 
+    char bufI[256];
+    memset(&server_sockaddr, 0, sizeof(struct sockaddr_un));
+    memset(&client_sockaddr, 0, sizeof(struct sockaddr_un));
+     
+
+client_sock = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (client_sock == -1) {
+        printf("SOCKET ERROR \n");
+        exit(1);
+    }
+
+    /***************************************/
+    /* Set up the UNIX sockaddr structure  */
+    /* by using AF_UNIX for the family and */
+    /* giving it a filepath to bind to.    */
+    /*                                     */
+    /* Unlink the file so the bind will    */
+    /* succeed, then bind to that file.    */
+    /***************************************/
+    client_sockaddr.sun_family = AF_UNIX;   
+    strcpy(&client_sockaddr.sun_path[1], CLIENT_PATH); 
+    len = sizeof(client_sockaddr);
+    
+    unlink(CLIENT_PATH);
+    rc = bind(client_sock, (struct sockaddr *) &client_sockaddr, len);
+    if (rc == -1){
+        printf("BIND ERROR: \n");
+        close(client_sock);
+        exit(1);
+    }
+        
+    /***************************************/
+    /* Set up the UNIX sockaddr structure  */
+    /* for the server socket and connect   */
+    /* to it.                              */
+    /***************************************/
+    server_sockaddr.sun_family = AF_UNIX;
+   // strcpy(server_sockaddr.sun_path, SERVER_PATH);
+    strncpy(&server_sockaddr.sun_path[1], SERVER_PATH,strlen(SERVER_PATH));
+    rc = connect(client_sock, (struct sockaddr *) &server_sockaddr, len);
+    //rc = connect(client_sock, (struct sockaddr*) &server_sockaddr, offsetof(struct sockaddr_un, sun_path) + 1/*\0*/ + strlen(SERVER_PATH));
+    if(rc == -1){
+        printf("CONNECT ERROR \n" );
+        close(client_sock);
+        exit(1);
+    }
+    
+    /************************************/
+    /* Copy the data to the buffer and  */
+    /* send it to the server socket.    */
+    /************************************/
+   // strcpy(bufI, DATA);                 
+   // printf("Sending data...\n");
+
+
+
+
+
+
+
+
+//--------------------------------------------------------------------------
+
 start=1;
+
 
 
 if(start)
 {
 	signal(SIGQUIT, sigquit_handler);
 	
-    struct sockaddr_un adrSerw[ilRob], adrKli[ilRob];
-	sfd=malloc(ilRob*sizeof(sfd));
+    struct sockaddr_un adrSerw[ilRob+1], adrKli[ilRob+1];
+	sfd=malloc((ilRob+1)*sizeof(sfd));
 
+		int dlugosc = strlen(buf);
+    if (dlugosc > 0 && buf[dlugosc-1] == '\n') 
+			buf[dlugosc-1] = '\0';
+	char* napis=malloc(dlugosc*sizeof(char));
+	napis = buf;
+	int A=strlen(napis)+1;
+	printf("A to %d\n",A);
 	idSerw="viper_serv";
 	idKli="viper_clint";
     pidRodzica=getpid();
@@ -165,25 +295,26 @@ if(start)
 	
 	pipe(fpipe);
 	signal(SIGALRM, sygnWys);
-	alarm(2);
+	alarm(czasAl);
+	//ualarm(900000,900000);  
 	
    
 
     /* Create client socket; bind to unique pathname (based on PID) */
 
-for(int i=0;i<ilRob;i++){
+for(int i=0;i<ilRob+1;i++){
     sfd[i] = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (sfd[i] == -1)
        perror("socket error");
    // else
 		//printf("zrobiono socket %d\n",i);
         
-    kanalPryw= malloc(ilRob*sizeof(*kanalPryw));
+    kanalPryw= malloc((ilRob+1)*sizeof(*kanalPryw));
     kanalPryw[i] = malloc(sizeof *kanalPryw[i] * DL_NAZWY);   
-	snprintf(nazwaKan,DL_NAZWY,"%s%d",idSerw,i);
+	snprintf(nazwaKan,DL_NAZWY,"%s%d",napis,i);
 	kanalPryw[i]=nazwaKan;
 	printf("%s",kanalPryw[i]);
-	kanalKlient= malloc(ilRob*sizeof(*kanalKlient));
+	kanalKlient= malloc((ilRob+1)*sizeof(*kanalKlient));
     kanalKlient[i] = malloc(sizeof *kanalKlient[i] * DL_NAZWY);   
 	snprintf(nazwaKanKl,DL_NAZWY,"%s%d",idKli,i);
 	kanalKlient[i]=nazwaKanKl;
@@ -195,8 +326,6 @@ for(int i=0;i<ilRob;i++){
     if (bind(sfd[i], (struct sockaddr *) &adrKli[i], 
       sizeof(sa_family_t) + strlen(kanalKlient[i]) + 1) == -1)
         perror("binding error");
-  //  else
-		//printf("zbindowany %s\n",kanalPryw[i]);
 
     /* Construct address of server */
 
@@ -210,7 +339,7 @@ for(int i=0;i<ilRob;i++){
         perror("fork error");
         exit(-1);
     } else if (pid == 0) {
-        printf("Robottnik (%d): %d\n", i + 1, getpid());
+        printf("Robotnik (%d): %d\n", i + 1, getpid());
         break; 
     }  
 }
@@ -236,12 +365,14 @@ while(!done){
 			}
         nanosleep(&spi,NULL); 
         clock_gettime(CLOCK_REALTIME, &czasProc);
+
+			//snprintf(datagram, DL_WIAD, "%s |sec:%ld, nsec:%ld\n",otrzym,czasProc.tv_sec,czasProc.tv_nsec);
         snprintf(datagram, DL_WIAD, "%s |sec:%ld, nsec:%ld\n",otrzym,czasProc.tv_sec,czasProc.tv_nsec);
         printf("Robotnik(%d) received value: %s\n", getpid(), otrzym);
 			 int wys=getpid()-pidRodzica-1;
 			 
        if (sendto(sfd[wys], datagram, DL_WIAD, 0, (struct sockaddr *) &adrSerw[wys],
-                 (sizeof(sa_family_t) + SEND_STRLEN + 1) ) != DL_WIAD) 
+                 (sizeof(sa_family_t) + A+ 1) ) != DL_WIAD) 
               perror("sendto");
        else{
 			printf("wyslal %d zawodnik\n",wys);
@@ -251,6 +382,50 @@ while(!done){
     
 }
 }
+char ww[100]="Koniec dzialania brygady.\n";
+char* selection=malloc(1);
+socklen_t len;
+
+  printf("Sending data...\n");
+    rc = send(client_sock, ww, strlen(ww), 0);
+    if (rc == -1) {
+        printf("SEND ERROR = n" );
+        close(client_sock);
+        exit(1);
+    }   
+    else {
+        printf("Data sent!\n");
+    }
+	printf("Zapytac o sume kontrolna? [y/n]\n");
+	//while('\n' != getchar())
+	//{}
+	scanf("%c", selection);
+	if(*selection=='y')
+	{
+		printf("Sending data...\n");
+   int rc2 = send(client_sock, selection, strlen(selection), 0);
+    if (rc2 == -1) {
+        printf("SEND ERROR selection" );
+        close(client_sock);
+        exit(1);
+    } 
+		
+		char* o2=malloc(300*sizeof(char));
+	int	rc3 = recv(client_sock, o2, 300,0);
+    if (rc3 == -1) {
+        printf("RECV ERROR \n");
+        close(client_sock);
+        exit(1);
+    }   
+    else {
+        printf("DATA RECEIVED = %s\n", o2);
+    }
+		
+		
+	}
+	else
+		printf("nie\n");
+	
     
 	}
 	

@@ -14,7 +14,7 @@
 #define DL_WIAD 40
 #define CH_SUM 40
 //#define ilRob 150	
-#define NAME_LEN 30
+#define NAME_LEN 50
 #define DL_NAZWY 35
 #define SHA_DIGEST_LENGTH 20
 
@@ -89,6 +89,7 @@ int main(int argc, char *argv[])
 	char* wysBajt=malloc(1*sizeof(char));
 	char* odebrWiad=malloc(DL_WIAD*sizeof(char));
 	char* nazwKan=malloc(DL_NAZWY*sizeof(char));
+	char* napisPryw;
 	int ilRob;
 	char* nazwaRej;
 	int ilosc=0;
@@ -200,6 +201,22 @@ int main(int argc, char *argv[])
     memset(&client_sockaddr, 0, sizeof(struct sockaddr_un));
     memset(buf, 0, 256);                
     
+    /*	int dlugosc = strlen(kanalRej);
+    if (dlugosc > 0 && kanalRej[dlugosc-1] == '\n') 
+			kanalRej[dlugosc-1] = '\0';
+	
+	napisPryw=malloc(dlugosc*sizeof(char));
+	napisPryw=kanalRej;
+    */
+    		int dlugosc = strlen(kanalRej);
+   if (dlugosc > 0 && kanalRej[dlugosc-1] == '\n') 
+			kanalRej[dlugosc-1] = '\0';
+	char* napis=malloc(dlugosc*sizeof(char));
+	
+	 strcpy(napis,kanalRej);
+    printf("NAPIS %s\n",napis);
+    printf("KANAL %s\n",kanalRej);
+    
     /**************************************/
     /* Create a UNIX domain stream socket */
     /**************************************/
@@ -221,9 +238,10 @@ int main(int argc, char *argv[])
     //strcpy(server_sockaddr.sun_path, SOCK_PATH); 
     len = sizeof(server_sockaddr);
     
-    unlink(SOCK_PATH);
     
-     strncpy(&server_sockaddr.sun_path[1], SOCK_PATH,strlen(SOCK_PATH));
+    
+     strncpy(&server_sockaddr.sun_path[1], napis,strlen(napis));
+     unlink(napis);
     rc = bind(server_sock, (struct sockaddr *) &server_sockaddr, len);
     if (rc == -1){
         printf("BIND ERROR: \n");
@@ -284,13 +302,8 @@ int main(int argc, char *argv[])
 	
 	//
 	if(datagram){
-		int dlugosc = strlen(kanalRej);
-    if (dlugosc > 0 && kanalRej[dlugosc-1] == '\n') 
-			kanalRej[dlugosc-1] = '\0';
-	char* napis=malloc(dlugosc*sizeof(char));
-	
-	napis=kanalRej;
-	int A=strlen(napis)+1;
+
+	//int A=strlen(napis)+1;
    struct sockaddr_un svaddr[ilRob], claddr[ilRob];
    
    wiadomosc=malloc(ilRob*sizeof(*wiadomosc));
@@ -411,11 +424,12 @@ int main(int argc, char *argv[])
      }
      
      int kon=0;
-     char ww[100];
+    char ww[30];
      while (!kon) {
 		 
 	  printf("waiting to read...\n");
-    bytes_rec = recv(client_sock, ww, sizeof(ww), 0);
+	   memset(ww, 0, sizeof(ww));
+    bytes_rec = recv(client_sock, ww, sizeof(ww),0);
     if (bytes_rec == -1){
         printf("RECV ERROR: \n");
         close(server_sock);
@@ -423,35 +437,33 @@ int main(int argc, char *argv[])
         exit(1);
     }
     else {
-        printf("DATA RECEIVED = %s\n", ww);
+        printf("Otrzymano komunikat: %s\n", ww);
     }
         //printf("bajty %ld\n",(long int)numBytes);                   
                            
 		char* o=malloc(1);
+		 memset(o, 0, sizeof(o));
 		int	bytes_rec2 = recv(client_sock, o, sizeof(o), 0);
 	
 		if(bytes_rec2>0)
 		{
 			if(*o=='y')
 			{
-				char suma[300];
+				char suma[100];
 				if(strcmp(sumaSH1,otrzymSH1)==0){
-				snprintf(suma,300,"suma %s, jest zgodna z wczeniej przeslana\n",sumaSH1);
-				printf("suma %s\n",suma);
+				snprintf(suma,100,"suma %s, jest zgodna\n z wczeniej przeslana\n",sumaSH1);
+				//printf("suma %s\n",suma);
 				}
 				else{
-					snprintf(suma,300,"suma %s, nie jest zgodna z wczeniej przeslana\n",sumaSH1);
+					snprintf(suma,100,"suma %s, nie jest zgodna\n z wczeniej przeslana\n",sumaSH1);
 					}
 				 rc = send(client_sock, suma, strlen(suma), 0);
-				printf("wyslano %s\n",suma);
+				//printf("wyslano %s\n",suma);
 				
-				}
-			else{
-		printf("Odebrano: %s", o);
-			}		
+				}		
 		}
 		
-		
+		free(o);
      kon=1;
      
     }
@@ -470,7 +482,8 @@ int main(int argc, char *argv[])
 		
 	
 	//free(kanalPryw);
-	//free(wiadomosc);
+	free(wiadomosc);
+	free(napis);
 	free(otrzymDat);
 	free(otrzymSH1);
 	free(kanalRej);

@@ -13,7 +13,7 @@
 #include <assert.h>
 #define SEND_STRLEN 11
 #define BUF_SIZE 100
-#define NAME_LEN 30
+#define NAME_LEN 50
 #define DL_WIAD 40
 #define DL_NAZWY 35
 #define SHA_DIGEST_LENGTH 20
@@ -60,11 +60,7 @@ void sigquit_handler (int sig) {
 
 
 void sygnWys(int sig) {
-		//unsigned char result[10];
-		//wiadomosc="sak";
-		//int al=2;
-		
-		//char data[5] = "basdt";
+	
 size_t length = strlen(wiadomosc);
 	char *a=malloc(40);
 	 a=f1(wiadomosc,length);
@@ -100,13 +96,14 @@ if(getpid()==pidRodzica){
 int main(int argc, char *argv[])
 {
 	struct sockaddr_un adres,adresP;
-  char buf[30];
+  char* buf=malloc(NAME_LEN*sizeof(char));
   char buf2[100];
 char* nazwaKan=malloc(DL_NAZWY*sizeof(char));
 char* nazwaKanKl=malloc(DL_NAZWY*sizeof(char));
 char* idSerw =malloc(NAME_LEN*sizeof(char));
 char* idKli =malloc(NAME_LEN*sizeof(char)); 
 char* otrzym=malloc(1*sizeof(char));
+//char* napis;
  char** kanalKlient;
     char** kanalPryw;
   int start=0;
@@ -195,9 +192,16 @@ while ((opt = getopt(argc, argv, "m:d:w:c:")) != -1)
 
 
 sleep(2);
-
-
 ilRob=atoi(ilRobStr);
+
+
+	int dlugosc = strlen(buf);
+char* napis=malloc(dlugosc*sizeof(char));	
+    if (dlugosc > 0 && buf[dlugosc-1] == '\n') 
+			buf[dlugosc-1] = '\0';
+	
+	 strcpy(napis,buf);
+
 
 
 
@@ -243,7 +247,7 @@ client_sock = socket(AF_UNIX, SOCK_STREAM, 0);
     /***************************************/
     server_sockaddr.sun_family = AF_UNIX;
    // strcpy(server_sockaddr.sun_path, SERVER_PATH);
-    strncpy(&server_sockaddr.sun_path[1], SERVER_PATH,strlen(SERVER_PATH));
+    strncpy(&server_sockaddr.sun_path[1], napis,strlen(napis));
     rc = connect(client_sock, (struct sockaddr *) &server_sockaddr, len);
     //rc = connect(client_sock, (struct sockaddr*) &server_sockaddr, offsetof(struct sockaddr_un, sun_path) + 1/*\0*/ + strlen(SERVER_PATH));
     if(rc == -1){
@@ -279,17 +283,13 @@ if(start)
     struct sockaddr_un adrSerw[ilRob+1], adrKli[ilRob+1];
 	sfd=malloc((ilRob+1)*sizeof(sfd));
 
-		int dlugosc = strlen(buf);
-    if (dlugosc > 0 && buf[dlugosc-1] == '\n') 
-			buf[dlugosc-1] = '\0';
-	char* napis=malloc(dlugosc*sizeof(char));
-	napis = buf;
+
 	int A=strlen(napis)+1;
-	printf("A to %d\n",A);
-	idSerw="viper_serv";
-	idKli="viper_clint";
+	//printf("A to %d\n",A);
+	//idSerw="viper_serv";
+	//idKli="viper_clint";
     pidRodzica=getpid();
-	printf("parent pid :%d\n",pidRodzica);
+	printf("PID Rodzica :%d\n",pidRodzica);
 	 
 	int pid;
 	
@@ -382,7 +382,8 @@ while(!done){
     
 }
 }
-char ww[100]="Koniec dzialania brygady.\n";
+char* ww=malloc(30*sizeof(char));
+ww="Koniec dzialania";
 char* selection=malloc(1);
 socklen_t len;
 
@@ -410,23 +411,20 @@ socklen_t len;
         exit(1);
     } 
 		
-		char* o2=malloc(300*sizeof(char));
-	int	rc3 = recv(client_sock, o2, 300,0);
+		char* o2=malloc(100*sizeof(char));
+	int	rc3 = recv(client_sock, o2, 100,0);
     if (rc3 == -1) {
         printf("RECV ERROR \n");
         close(client_sock);
         exit(1);
     }   
     else {
-        printf("DATA RECEIVED = %s\n", o2);
+		sleep(1);
+        printf("Otzymano: %s\n", o2);
     }
 		
 		
-	}
-	else
-		printf("nie\n");
-	
-    
+	}  
 	}
 	
 	
@@ -454,12 +452,9 @@ socklen_t len;
 	}
 	free(kanalPryw);
 	free(kanalKlient);
-	
+	free(napis);
 	free(nazwaKan);
 	free(nazwaKanKl);
-	//free(idSerw);
-	//free(idKli);
-	free(otrzym);
 	
 	printf("zwolnil\n");
                /* Remove client socket pathname */

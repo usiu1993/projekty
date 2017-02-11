@@ -6,7 +6,9 @@
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
-#define NAME 25
+#include <sys/types.h>
+#include <sys/stat.h>
+#define NAME 55
 #define BLOCK 31
 int czas;
 
@@ -19,7 +21,6 @@ void komunikat(int sig) {
 	alarm(czas);    
 	signal(SIGALRM, komunikat);
 }
-
 
 
 int main(int argc, char** argv)
@@ -37,14 +38,13 @@ int main(int argc, char** argv)
 	{
 		switch (opt) 
 		{
-
 			case 'd':
-				czas=atof(optarg);
+				czas=strtod(optarg,NULL);
 				break;
 
-			default:
-				printf("Usage: %s [-t ntime(sec)] [-c string]\n", argv[0]);
-				exit(1);
+			//default:
+				//printf("Uzycie:  [-d czas komunikatu\n");
+				//exit(1);
 		}
 	}
 	//Odczytanie ścieżki fifo bez parametru
@@ -53,7 +53,12 @@ int main(int argc, char** argv)
 		while(optind<argc)
 		{
 			strncpy(nazwaFifo,argv[optind],NAME);
-			printf("%s \n",nazwaFifo);
+			//printf("%s \n",nazwaFifo);
+			//if (stat(nazwaFifo, &st) == -1) {
+			//mkdir(nazwaFifo, 0700);
+		//}
+			int a =mkfifo(nazwaFifo, 0666);
+		printf("otworzyl %s ale a= %d\n",nazwaFifo,a);
 			optind++;
 		}
 
@@ -64,12 +69,23 @@ int main(int argc, char** argv)
 	signal(SIGALRM, komunikat);
 	alarm(czas);
 
-	if(access(nazwaFifo,F_OK) != -1)
-		fd = open(nazwaFifo,O_RDONLY);
-
+	if(access(nazwaFifo,F_OK) != -1){
+	//	mkfifo(nazwaFifo, 0666);
+		//printf("otworzyl\n");
+		fd = open(nazwaFifo,O_RDWR);
+	}
+	
+	/*struct sigaction sigpipeS;
+	sigpipeS.sa_handler = sigpipe_handler;
+	sigpipeS.sa_flags   = 0;    
+	sigemptyset(&sigpipeS.sa_mask); 
+	sigaddset(&sigpipeS.sa_mask, SIGINT);
+	*/
+	
 	//Czytanie dopóki są dostarczane informacje
 	while(read(fd,otrzymDane,sizeof(otrzymDane)))
 	{
+		
 		fflush(stdout);
 		printf("----------------------------\n");
 		printf("...otrzymano:       %s\n",otrzymDane);
@@ -85,9 +101,10 @@ int main(int argc, char** argv)
 	//Zamknięcie deskryptora
 	ret_value=close(fd);
 	if (ret_value != 0)  {
-		printf("\nFclose failed");
-		printf("\nerrno is %d",errno);
-		exit(EXIT_FAILURE);
+		{
+			perror("close error\n");
+			exit(-1);
+		}
 	}	
 
 	free(nazwaFifo);

@@ -7,7 +7,7 @@
 #include <string.h>
 #include <errno.h>
 #define DANE 32
-#define NAZWA 20
+#define NAZWA 60
 #define NR 3
 #define errorExit(blad) { fprintf(stderr,blad); fprintf(stderr, " nr bledu: %d\n", errno); exit(EXIT_FAILURE); } 
 
@@ -35,7 +35,10 @@ void odczytZapis(int* kolejka,int iFifo)
 			for(int i=0;i<iFifo;i++){
 
 					if (sigaction(SIGPIPE, &sigpipeS, NULL) == -1)
-						errorExit("sigaction error\n");
+						{
+			perror("sigaction error\n");
+			exit(-1);
+		}
 						//Przypadek 1 zamknięcie strumienia 
 					if ((ilBajt = write(kolejka[i], bufor, DANE)) == -1)
 					{
@@ -60,10 +63,9 @@ void odczytZapis(int* kolejka,int iFifo)
 					}	//Przypadek 2 przepełnienie kolejki
 					else if(ilBajt<DANE)
 					{
-						fprintf(stderr,"Blad odczytu, przepelnione fifo\n");
+						fprintf(stderr,"Blad odczytu, przepelnione fifo! wyrzucam kanał odeskryptorze %d\n",kolejka[i]);
 						close(kolejka[i]);
 						kolejka[i]=-1;					
-						fprintf(stderr,"wyrzucam kanał\n"); 
 						for(int i=0;i<iFifo;i++)
 						{		//Zaktualizowanie obsługiwanych kolejek
 							if(kolejka[i]==-1)
@@ -91,9 +93,12 @@ int main(int argc, char** argv)
 	int DIAGNOSTIC =0;	
 	int opt;
 	int ilKolejek;
-	char* nazwa=(char*) malloc(DANE*sizeof(*nazwa));
-	char* nr=(char*) malloc(NR*sizeof(*nr));
-	char* nazwaPliku=(char*) malloc(DANE*sizeof(*nazwaPliku));
+	char nazwa[DANE];
+	//char* nazwa=(char*) malloc(DANE*sizeof(*nazwa));
+	//char* nr=(char*) malloc(NR*sizeof(*nr));
+	char nr[NR];
+	//char* nazwaPliku=(char*) malloc(DANE*sizeof(*nazwaPliku));
+	char nazwaPliku[DANE];
 	int diag;
 
 	while ((opt = getopt(argc, argv, "p:c:L:")) != -1) 
@@ -101,14 +106,14 @@ int main(int argc, char** argv)
 		switch (opt) 
 		{
 			case 'p':
-				nazwa=optarg;
+				strcpy(nazwa,optarg);
 				break;
 			case 'c':
-				ilKolejek=atoi(optarg);
+				ilKolejek=strtol(optarg,NULL,0);
 				break;
 			case 'L':
 				DIAGNOSTIC=1;
-				nazwaPliku=optarg;
+				strcpy(nazwaPliku,optarg);
 				break;
 			default:
 				printf("Wymagane: -p<string> -c<int>\n");
@@ -120,18 +125,27 @@ int main(int argc, char** argv)
 	if(DIAGNOSTIC)
 	{
 		diag = open(nazwaPliku, O_RDWR|O_CREAT|O_APPEND, 0600);
-		if (-1 == diag) { errorExit("blad otwarcia pliku\n");}	
+		if (-1 == diag) {{
+			perror("file open error\n");
+			exit(-1);
+		}}	
 
-		if (-1 == dup2(diag, fileno(stderr))) { errorExit("blad przekierowania stderr\n");}
+		if (-1 == dup2(diag, fileno(stderr))) { {
+			perror("redirect error\n");
+			exit(-1);
+		}}
 	}
-	char *nazwaKol=(char*) malloc(NAZWA*sizeof(*nazwaKol));
-	int *fd=(int*) malloc(ilKolejek*sizeof(*fd));
+	char nazwaKol[NAZWA];
+	int fd[ilKolejek];
+	//char *nazwaKol=(char*) malloc(NAZWA*sizeof(*nazwaKol));
+	//int *fd=(int*) malloc(ilKolejek*sizeof(*fd));
 	strcpy(nazwaKol, nazwa);
-	char **kolejki = malloc(sizeof *kolejki * ilKolejek);
+	//char **kolejki = malloc(sizeof *kolejki * ilKolejek);
+	char kolejki[ilKolejek][NAZWA];
 	struct stat sBuf;
 	for (int i = 0 ; i<ilKolejek; i++)
 	{
-		kolejki[i] = malloc(sizeof *kolejki[i] * NAZWA);
+		//kolejki[i] = malloc(sizeof *kolejki[i] * NAZWA);
 		sprintf(nr,"%d",i);
 		strcat(nazwaKol, nr);
 		memset (&sBuf, 0, sizeof (sBuf));
@@ -145,10 +159,11 @@ int main(int argc, char** argv)
 		strcpy(nazwaKol, nazwa);
 	}
 	int iloscAktyw=0;
-	int* aktywneKol=(int*)malloc(1*sizeof(*aktywneKol));
+	//int aktywneKol
+	int* aktywneKol=(int*)malloc(sizeof(int));
 	for(int k=0;k<ilKolejek;k++)
 	{		//sprawdzenie czy plik jest otwarty do pisania
-		fd[k]=open(kolejki[k],O_WRONLY |O_NONBLOCK);	
+		fd[k]=open(kolejki[k],O_WRONLY);	
 		if(fd[k]!=-1)
 		{	fprintf(stderr,"%s otwarto do pisania, deskryptor: %d\n",kolejki[k],fd[k]);
 			iloscAktyw++;
@@ -181,13 +196,13 @@ int main(int argc, char** argv)
 		close(aktywneKol[i]);
 
 		//Zwolnienie pamięci
-	for(int k=0;k<ilKolejek;k++)
-		free(kolejki[k]);
+	//for(int k=0;k<ilKolejek;k++)
+	//	free(kolejki[k]);
 
-	free(kolejki);
-	free(fd);
-	free(nazwaKol);
+	//free(kolejki);
+	//free(fd);
+	//free(nazwaKol);
 	free(aktywneKol);	
-	free(nr);
+	//free(nr);
 	return 0;
 }

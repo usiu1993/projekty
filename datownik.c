@@ -11,7 +11,8 @@
 #include <errno.h>
 #define CLOCKID CLOCK_REALTIME
 #define SIG SIGUSR1
-#define NAME 15
+#define NAME 60
+#define ILOSC 50
 #define NR 3
 #define BLOCK 31
 #define DANE 32
@@ -20,69 +21,24 @@
 
 timer_t timerid;
 sig_atomic_t volatile aktywny = 1;
-int *kanal;
-int *pkanal;
-char** kanalFifo;
-int* kanalPipe;
+int kanal[ILOSC];
 int ret;
 float odchyl=0;
-int odstep;
+float odstep;
 int liczFifo;
 int liczPipe;
 int PIPE=0;
 int FIFO=0;
-char *wiad;
+char wiad[BLOCK];
 struct itimerspec itimer;
 struct timespec czasReal;
+struct timespec tim;
+int kanalPipe[ILOSC];
 
-
-void timer_handler (int signum)
-{
-	struct sigaction sa1;
-	struct itimerval timer1;
-	srand( time( NULL ) );
-	memset (&timer1, 0, sizeof (timer1));
-	memset (&sa1, 0, sizeof (sa1));
-		// Konfiguracja sygnału dla timera
-	sa1.sa_handler = &timer_handler;
-
-	if (sigaction (SIGVTALRM, &sa1, NULL) == -1)
-				errorExit("sigaction error");
-
-		//Losowy czas z podanego przedziału
-	float czasLos = (odstep-odchyl)+(float)rand() / RAND_MAX * (2*odchyl);
-	while(czasLos<=0)
-		czasLos = (odstep-odchyl)+(float)rand() / RAND_MAX * (2*odchyl);
-		//Obliczenie sekund i nanosekund	
-	int czasLosSek=(int)czasLos;
-	czasLos=czasLos-czasLosSek;
-	int czasLosNsek=czasLos*1000000;
-		//Ustawienie czasu timera
-	timer1.it_value.tv_sec = czasLosSek;
-	timer1.it_value.tv_usec = czasLosNsek;	
-		//Pobrnie czasu z zegara realnego
-	clock_gettime(CLOCK_REALTIME, &czasReal);
-	snprintf(wiad, 32, "sec:%ld, nsec:%ld\n",czasReal.tv_sec,czasReal.tv_nsec);
-		//Ustawienie przygotowanego timera
-	setitimer (ITIMER_VIRTUAL, &timer1, NULL);
-			//Pisanie do podanych fifo i pipe
-		for(int i =1;i<=liczFifo;i++)
-		{
-
-			write(kanal[i],wiad,DANE);
-		}
-		
-		for(int i=1;i<=liczPipe;i++)
-		{
-			
-		write(kanalPipe[i],wiad,DANE);	
-		
-		}
-
-
-
-}
-
+//void timer_handler (int signum)
+void komunikacja();
+void zegarUst(clockid_t zeg,float czasZ);
+void timerUst(float ods,float odch,struct itimerval t);
 
 	//handler dla pomiaru czasu odstępów między stemplami
 static void handler(int sig, siginfo_t *signal, void *handler)
@@ -102,10 +58,9 @@ int main(int argc, char *argv[])
 	int wyborKan=0;
 	int opt;
 	float czas;
-	kanalFifo = malloc(1*sizeof(char*));
-	kanalPipe = malloc(1*sizeof(int*));
-	struct sigevent sev;
-	struct itimerspec itimspec;
+	char kanalFifo[ILOSC][NAME];
+	
+	
 	struct sigaction sa;
 	clockid_t zegar;
 	srand( time( NULL ) );
@@ -126,21 +81,21 @@ int main(int argc, char *argv[])
 		{
 			case 'm':
 				obowCzas++;
-				odstep=atof(optarg);
+				odstep=strtod(optarg,NULL);
 				break;
 			case 'd':
-				odchyl=atof(optarg);
+				odchyl=strtod(optarg,NULL);
 				break;
 
 			case 'w':
 				wyborZeg--;
-				czas=atof(optarg);
+				czas=strtod(optarg,NULL);
 				zegar=CLOCK_REALTIME;
 				break;
 			case 'c':
 				if(wyborZeg!=0){
 					wyborZeg--;
-					czas=atof(optarg);	
+					czas=strtod(optarg,NULL);	
 					zegar = CLOCK_MONOTONIC;
 					break;
 				}
@@ -152,7 +107,7 @@ int main(int argc, char *argv[])
 			case 'p':
 				if(wyborZeg!=0){
 					wyborZeg--;
-					czas=atof(optarg);
+					czas=strtod(optarg,NULL);
 					zegar =CLOCK_PROCESS_CPUTIME_ID;
 					break;
 				}
@@ -164,16 +119,14 @@ int main(int argc, char *argv[])
 			case 'f':
 				liczFifo++;
 				wyborKan++;
-				kanalFifo[liczFifo] = malloc(NAME*sizeof(char));
-				kanalFifo[liczFifo] = optarg;
-				kanalFifo=realloc(kanalFifo,NAME*liczFifo*sizeof(char*));
+				strcpy(kanalFifo[liczFifo],optarg);
+				printf("fifo: %s\n",kanalFifo[liczFifo]);
 				FIFO=1;
 				break;
 			case 's':
 				liczPipe++;
 				wyborKan++;
-				kanalPipe=realloc(kanalPipe,NR*liczPipe*sizeof(int*));
-				kanalPipe[liczPipe]=atoi(optarg);
+				kanalPipe[liczPipe]=strtol(optarg,NULL,0);
 				PIPE=1;
 				break;
 
@@ -197,72 +150,44 @@ int main(int argc, char *argv[])
 	sigemptyset(&sa.sa_mask);
 
 	if (sigaction(SIG, &sa, NULL) == -1)
-		errorExit("sigaction error\n");
-		
+		{perror("sigaction error\n");
+			exit(-1);
+		}
+		//errorExit("sigaction error\n");
 
-	wiad=(char*) malloc(BLOCK*sizeof(*wiad));
-	kanal=(int*)malloc(liczFifo*sizeof(int*));
 		//Stworzenie i otwarcie plików fifo
 	for(int i=1; i<=liczFifo;i++)
 	{
 		if (access(kanalFifo[i], F_OK) == -1){
 			mkfifo(kanalFifo[i], 0666);
 		}
-		kanal[i] = open(kanalFifo[i], O_WRONLY | O_NONBLOCK);
+		kanal[i] = open(kanalFifo[i], O_WRONLY); //zle
 		if(kanal[i]==-1)
-			errorExit("blad otwarcia fifo");
+		{
+			perror("fifo open error\n");
+			exit(-1);
+		}
 	}
 	if(!wyborZeg)
 	{
-		//Utworzenie i konfiguracja wybranego timera pomiaru czasu
-	sev.sigev_notify = SIGEV_SIGNAL;
-	sev.sigev_signo = SIG;
-	sev.sigev_value.sival_ptr = &timerid;
-
-	if (timer_create(zegar, &sev, &timerid) == -1)
-		errorExit("timer_create error\n");	
-		
-		//Obliczenie sek/nsek dla timera odliczającego czas
-	int czasSek=(int)czas;
-	czas=czas-czasSek;
-	int czasNsek= czas*1000000000;
-	itimspec.it_value.tv_sec =czasSek;
-	itimspec.it_value.tv_nsec = czasNsek;
-	itimspec.it_interval.tv_sec = itimspec.it_value.tv_sec;
-	itimspec.it_interval.tv_nsec = itimspec.it_value.tv_nsec;
-	timer_settime(timerid, 0, &itimspec, NULL);
+		zegarUst(zegar,czas);
 	}
 		// Konfiguracja sygnału dla timera
 	struct itimerval timer;
 	memset (&sa, 0, sizeof (sa));
-	sa.sa_handler = &timer_handler;
-
+	timerUst(odstep,odchyl,timer);
+	
 	if (sigaction (SIGVTALRM, &sa, NULL) == -1)
-		errorExit("sigaction error\n");
-	
-
-		//Losowy czas z podanego przedziału
-	float czasLos=(odstep-odchyl)+(float)rand() / RAND_MAX * (2*odchyl);
-	while(czasLos<=0)
-		czasLos = (odstep-odchyl)+(float)rand() / RAND_MAX * (2*odchyl);
-		//Obliczenie sekund i nanosekund
-	int czasLosSek=(int)czasLos;
-	czasLos=czasLos-czasLosSek;
-	int czasLosNsek=czasLos*1000000;
-	
-		//Ustawienie czasu pierwszego wygaśnięcia timera
-	timer.it_value.tv_sec = czasLosSek;
-	timer.it_value.tv_usec = czasLosNsek;
-		//Następne czasy są losowane w handlerze
-	timer.it_interval.tv_sec = 0;
-	timer.it_interval.tv_usec = 0;
-		//Ustawienie przygotowanego timera
-	setitimer (ITIMER_VIRTUAL, &timer, NULL);
-	if (setitimer (ITIMER_VIRTUAL, &timer, NULL) == -1)
-				errorExit("settimer error\n");
-	
+		{
+			perror("sigaction error\n");
+			exit(-1);
+		}
+		
+		
 		//Praca programu
-	while (aktywny){}
+	while (aktywny){
+		komunikacja();
+		}
 
 
 		//Zwolnienie pamięci
@@ -271,15 +196,109 @@ int main(int argc, char *argv[])
 		close(kanal[i]);
 		ret = remove(kanalFifo[i]);
 		if (ret != 0)  {
-			fprintf(stderr,"\nnie usunieto %s",kanalFifo[i]);
-			fprintf(stderr,"\nerrno: %d",errno);
-			exit(9);
+			{
+			perror("remove fifo error\n");
+			exit(-1);
+			}
 		}
 		unlink(kanalFifo[i]);
-		free(kanalFifo[i]);
+
 	}
-	free(kanalFifo);
-	free(kanal);
-	free(kanalPipe);
-	free(wiad);
+
 }
+
+
+void komunikacja()
+{
+
+	srand( time( NULL ) );
+		//Losowy czas z podanego przedziału
+	float czasLos = (odstep-odchyl)+(float)rand() / RAND_MAX * (2*odchyl);
+	while(czasLos<=0)
+		czasLos = (odstep-odchyl)+(float)rand() / RAND_MAX * (2*odchyl);
+		//Obliczenie sekund i nanosekund	
+	int czasLosSek=(int)czasLos;
+	czasLos=czasLos-czasLosSek;
+	int czasLosNsek=czasLos*1000000;	
+		//Pobrnie czasu z zegara realnego
+	clock_gettime(CLOCK_REALTIME, &czasReal);
+	snprintf(wiad, 32, "sec:%ld, nsec:%ld\n",czasReal.tv_sec,czasReal.tv_nsec);
+	
+	tim.tv_sec = czasLosSek;
+	tim.tv_nsec = czasLosNsek;
+  
+			//Pisanie do podanych fifo i pipe
+		for(int i =1;i<=liczFifo;i++)
+		{
+
+			write(kanal[i],wiad,DANE);
+		}
+		
+		for(int i=1;i<=liczPipe;i++)
+		{
+			
+		write(kanalPipe[i],wiad,DANE);	
+		
+		}
+
+	 nanosleep(&tim, NULL);
+
+}
+
+void zegarUst(clockid_t zeg,float czasZ)
+{
+	
+	struct sigevent sev;
+	struct itimerspec itimspec;
+		//Utworzenie i konfiguracja wybranego timera pomiaru czasu
+	sev.sigev_notify = SIGEV_SIGNAL;
+	sev.sigev_signo = SIG;
+	sev.sigev_value.sival_ptr = &timerid;
+
+	if (timer_create(zeg, &sev, &timerid) == -1)
+		{
+			perror("timer create error\n");
+			exit(-1);
+		}
+		
+		//Obliczenie sek/nsek dla timera odliczającego czas
+	int czasSek=(int)czasZ;
+	czasZ=czasZ-czasSek;
+	int czasNsek= czasZ*1000000000;
+	itimspec.it_value.tv_sec =czasSek;
+	itimspec.it_value.tv_nsec = czasNsek;
+	itimspec.it_interval.tv_sec = itimspec.it_value.tv_sec;
+	itimspec.it_interval.tv_nsec = itimspec.it_value.tv_nsec;
+	timer_settime(timerid, 0, &itimspec, NULL);
+	
+	
+	}
+	
+	void timerUst(float ods,float odch,struct itimerval t)
+{
+		//Losowy czas z podanego przedziału
+	float czasLos=(ods-odch)+(float)rand() / RAND_MAX * (2*odch);
+	while(czasLos<=0)
+		czasLos = (ods-odch)+(float)rand() / RAND_MAX * (2*odch);
+		//Obliczenie sekund i nanosekund
+	int czasLosSek=(int)czasLos;
+	
+	czasLos=czasLos-czasLosSek;
+	int czasLosNsek=czasLos*1000000;
+	
+		//Ustawienie czasu pierwszego wygaśnięcia timera
+	t.it_value.tv_sec = czasLosSek;
+	t.it_value.tv_usec = czasLosNsek;
+		//Następne czasy są losowane w handlerze
+	t.it_interval.tv_sec = 0;
+	t.it_interval.tv_usec = 0;
+		//Ustawienie przygotowanego timera
+	setitimer (ITIMER_VIRTUAL, &t, NULL);
+	if (setitimer (ITIMER_VIRTUAL, &t, NULL) == -1)
+				{
+			perror("timer set error\n");
+			exit(-1);
+		}
+	
+	
+	}

@@ -18,7 +18,7 @@ gcc -Wall -o odbiornik odbiornik.c
 ./odbiornik -d6 $fifo2 &
 
 sleep 1
-./datownik -m3 -d0.5 -p10 -f$fifo1 -f$fifo2 &&
+./datownik -m3 -d0.5 -c10 -f$fifo1 -f$fifo2 &&
 
 sleep 2
 exit

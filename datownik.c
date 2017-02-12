@@ -11,7 +11,7 @@
 #include <errno.h>
 #define CLOCKID CLOCK_REALTIME
 #define SIG SIGUSR1
-#define NAME 60
+#define NAZWA 80
 #define ILOSC 50
 #define NR 3
 #define BLOCK 31
@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
 	int wyborKan=0;
 	int opt;
 	float czas;
-	char kanalFifo[ILOSC][NAME];
+	char kanalFifo[ILOSC][NAZWA];
 	
 	
 	struct sigaction sa;
@@ -214,13 +214,14 @@ void komunikacja()
 	srand( time( NULL ) );
 		//Losowy czas z podanego przedziału
 	float czasLos = (odstep-odchyl)+(float)rand() / RAND_MAX * (2*odchyl);
-	while(czasLos<=0)
+	while(czasLos<0)
 		czasLos = (odstep-odchyl)+(float)rand() / RAND_MAX * (2*odchyl);
 		//Obliczenie sekund i nanosekund	
 	int czasLosSek=(int)czasLos;
 	czasLos=czasLos-czasLosSek;
-	int czasLosNsek=czasLos*1000000;	
-		//Pobrnie czasu z zegara realnego
+	int czasLosNsek=czasLos*1000000000;	
+
+		//Pobranie czasu z zegara realnego
 	clock_gettime(CLOCK_REALTIME, &czasReal);
 	snprintf(wiad, 32, "sec:%ld, nsec:%ld\n",czasReal.tv_sec,czasReal.tv_nsec);
 	

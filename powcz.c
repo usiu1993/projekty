@@ -7,7 +7,7 @@
 #include <string.h>
 #include <errno.h>
 #define DANE 32
-#define NAZWA 80
+#define NAZWA 60
 #define NR 3
 #define errorExit(blad) { fprintf(stderr,blad); fprintf(stderr, " nr bledu: %d\n", errno); exit(EXIT_FAILURE); } 
 
@@ -88,35 +88,18 @@ void odczytZapis(int* kolejka,int iFifo)
 }
 
 
-int diagnostyka(char* nazwa)
-{
-		int d = open(nazwa, O_RDWR|O_CREAT|O_APPEND, 0600);
-		if (-1 == d) {{
-			perror("file open error\n");
-			exit(-1);
-		}}	
-
-		if (-1 == dup2(d, fileno(stderr))) { {
-			perror("redirect error\n");
-			exit(-1);
-		}}
-		
-		return d;
-	
-}
-
 int main(int argc, char** argv)
 {	
-	int DIAGNOSTIC=0;	
-	char nazwa[DANE];
-	char nr[NR];
-	char nazwaPliku[DANE];	
-	char nazwaKol[NAZWA];
-
-	struct stat sBuf;
-	int diag;
+	int DIAGNOSTIC =0;	
 	int opt;
 	int ilKolejek;
+	char nazwa[DANE];
+	//char* nazwa=(char*) malloc(DANE*sizeof(*nazwa));
+	//char* nr=(char*) malloc(NR*sizeof(*nr));
+	char nr[NR];
+	//char* nazwaPliku=(char*) malloc(DANE*sizeof(*nazwaPliku));
+	char nazwaPliku[DANE];
+	int diag;
 
 	while ((opt = getopt(argc, argv, "p:c:L:")) != -1) 
 	{
@@ -133,23 +116,36 @@ int main(int argc, char** argv)
 				strcpy(nazwaPliku,optarg);
 				break;
 			default:
-				printf("Wymagane: -p<string> -c<int> opcjonalne L<string>\n");
+				printf("Wymagane: -p<string> -c<int>\n");
 				exit(1);
 
 		}
 	}
-	
-	int fd[ilKolejek];
-	char kolejki[ilKolejek][NAZWA];
-	
 		//Jeżeli wybrano parametr -L, informacje diag. gromadzone w pliku
 	if(DIAGNOSTIC)
-		diag=diagnostyka(nazwaPliku);
+	{
+		diag = open(nazwaPliku, O_RDWR|O_CREAT|O_APPEND, 0600);
+		if (-1 == diag) {{
+			perror("file open error\n");
+			exit(-1);
+		}}	
 
+		if (-1 == dup2(diag, fileno(stderr))) { {
+			perror("redirect error\n");
+			exit(-1);
+		}}
+	}
+	char nazwaKol[NAZWA];
+	int fd[ilKolejek];
+	//char *nazwaKol=(char*) malloc(NAZWA*sizeof(*nazwaKol));
+	//int *fd=(int*) malloc(ilKolejek*sizeof(*fd));
 	strcpy(nazwaKol, nazwa);
-	
+	//char **kolejki = malloc(sizeof *kolejki * ilKolejek);
+	char kolejki[ilKolejek][NAZWA];
+	struct stat sBuf;
 	for (int i = 0 ; i<ilKolejek; i++)
 	{
+		//kolejki[i] = malloc(sizeof *kolejki[i] * NAZWA);
 		sprintf(nr,"%d",i);
 		strcat(nazwaKol, nr);
 		memset (&sBuf, 0, sizeof (sBuf));
@@ -163,6 +159,7 @@ int main(int argc, char** argv)
 		strcpy(nazwaKol, nazwa);
 	}
 	int iloscAktyw=0;
+	//int aktywneKol
 	int* aktywneKol=(int*)malloc(sizeof(int));
 	for(int k=0;k<ilKolejek;k++)
 	{		//sprawdzenie czy plik jest otwarty do pisania
@@ -174,6 +171,7 @@ int main(int argc, char** argv)
 			aktywneKol[iloscAktyw-1]=fd[k];
 		}
 		else if(strcmp(kolejki[k],"")!=0){
+			fprintf(stderr,"%s nie jest otwarta do pisania\n",kolejki[k]);
 			close(fd[k]);
 		}	
 		
@@ -196,7 +194,15 @@ int main(int argc, char** argv)
 		//Zamknięcie pozostałych połączeń
 	for(int i=0;i<iloscAktyw;i++)
 		close(aktywneKol[i]);
-		
+
+		//Zwolnienie pamięci
+	//for(int k=0;k<ilKolejek;k++)
+	//	free(kolejki[k]);
+
+	//free(kolejki);
+	//free(fd);
+	//free(nazwaKol);
 	free(aktywneKol);	
+	//free(nr);
 	return 0;
 }

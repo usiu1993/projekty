@@ -5,24 +5,24 @@
 # powielacza.
 
 dir="wyniki_przerwania"
-mkfifo "/tmp/a1"
-mkfifo "/tmp/a4"
-mkfifo "/tmp/a6"
 mkdir $dir
+fifo4="/tmp/testF4"
+fifo6="/tmp/testF6"
+fifo="/tmp/testF"
 
 gcc -Wall -o datownik datownik.c -lrt
 gcc -Wall -o odbiornik odbiornik.c
 gcc -Wall -o powielacz powielacz.c
 
-./odbiornik "/tmp/a4" > $dir/wynik4.txt 2>&1 &
+./odbiornik $fifo4 > $dir/wynik4.txt 2>&1 &
 pid4=$!
-./odbiornik "/tmp/a6" > $dir/wynik6.txt 2>&1 &
+./odbiornik $fifo6 > $dir/wynik6.txt 2>&1 &
 pid6=$!
 disown $pid4
 disown $pid6
 
 sleep 1
-./datownik -m1 -d0.5 -w40 -s1 | ./powielacz -p"/tmp/a" -c7 &
+./datownik -m1 -d0.5 -w40 -s1 | ./powielacz -p $fifo -c7 &
 sleep 3
 kill -9 $pid4
 sleep 4

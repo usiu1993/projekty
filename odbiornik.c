@@ -8,31 +8,37 @@
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#define NAME 55
+#include <sys/time.h>
+
+#define NAZWA 80
 #define BLOCK 31
-int czas;
+#define CLOCKID CLOCK_REALTIME
+
 
 //Wyświetlenie komunikatu,że odbiorca działa
 void komunikat(int sig) {
+	fflush(stdout);
 	struct timespec czasProc;
 	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &czasProc);
 
 	printf("\n\nKomunikat odbiorcy  sec: %ld, nsec: %ld\n\n\n",czasProc.tv_sec,czasProc.tv_nsec);
-	alarm(czas);    
-	signal(SIGALRM, komunikat);
+	 signal(SIGALRM,komunikat);
+
 }
 
 
 int main(int argc, char** argv)
 {
 	struct timespec czasAlarm;
+	struct itimerval tim;
 	int opt;
-	char* nazwaFifo = malloc(NAME*sizeof(char*));
+	//char* nazwaFifo = malloc(NAZWA*sizeof(char*));
+	char nazwaFifo[NAZWA];
 	int ret_value;
 	int fd;	
 	char otrzymDane[BLOCK+2];
 	long int czasPorSek, czasPorNsek;
-
+	float czas;
 
 	while ((opt = getopt(argc, argv, "d:")) != -1) 
 	{
@@ -41,10 +47,6 @@ int main(int argc, char** argv)
 			case 'd':
 				czas=strtod(optarg,NULL);
 				break;
-
-			//default:
-				//printf("Uzycie:  [-d czas komunikatu\n");
-				//exit(1);
 		}
 	}
 	//Odczytanie ścieżki fifo bez parametru
@@ -52,36 +54,34 @@ int main(int argc, char** argv)
 	{
 		while(optind<argc)
 		{
-			strncpy(nazwaFifo,argv[optind],NAME);
-			//printf("%s \n",nazwaFifo);
-			//if (stat(nazwaFifo, &st) == -1) {
-			//mkdir(nazwaFifo, 0700);
-		//}
-			int a =mkfifo(nazwaFifo, 0666);
-		printf("otworzyl %s ale a= %d\n",nazwaFifo,a);
+			strncpy(nazwaFifo,argv[optind],NAZWA);
+			mkfifo(nazwaFifo, 0666);
 			optind++;
 		}
 
 	}
+	
+	
+  
+	int czasSek=(int)czas;
+	czas=czas-czasSek;
+	int czasNsek=czas*1000000;
+  
+  //Ustawienie czasu komunikatu 
+  tim.it_interval.tv_sec = czasSek;
+  tim.it_interval.tv_usec =czasNsek ;
+  tim.it_value.tv_sec = czasSek; 
+  tim.it_value.tv_usec = czasNsek;
+  setitimer(ITIMER_REAL, &tim,0);
 
-
-	//Komunikat o istnieniu odbiornika
-	signal(SIGALRM, komunikat);
-	alarm(czas);
-
+// Ustawienie alarmu
+  signal(SIGALRM,komunikat); 
+  
 	if(access(nazwaFifo,F_OK) != -1){
-	//	mkfifo(nazwaFifo, 0666);
-		//printf("otworzyl\n");
-		fd = open(nazwaFifo,O_RDWR);
+		fd = open(nazwaFifo,O_RDONLY);
 	}
 	
-	/*struct sigaction sigpipeS;
-	sigpipeS.sa_handler = sigpipe_handler;
-	sigpipeS.sa_flags   = 0;    
-	sigemptyset(&sigpipeS.sa_mask); 
-	sigaddset(&sigpipeS.sa_mask, SIGINT);
-	*/
-	
+
 	//Czytanie dopóki są dostarczane informacje
 	while(read(fd,otrzymDane,sizeof(otrzymDane)))
 	{
@@ -106,8 +106,7 @@ int main(int argc, char** argv)
 			exit(-1);
 		}
 	}	
-
-	free(nazwaFifo);
+	unlink(nazwaFifo);
 
 
 	return 0;

@@ -4,31 +4,35 @@
 # Tworzonych jest 2 odbiorców, wysyłających otrzymane dane do pliku. 
 # W ścieżce podanej do powielacza z parametrem -L gromadzone są informacje diagnostyczne.
 
-fifo1="/tmp/c1"
-fifo2="/tmp/c4"
-fifo3="/tmp/c5"
-fifo="/tmp/c"
-diag="diag.txt"
+fifo1="/tmp/fifotest1"
+fifo4="/tmp/fifotest4"
+fifo5="/tmp/fifotest5"
+fifo="/tmp/fifotest"
+diag="diagnostyka.txt"
 dir=wyniki_powielacz
 
-mkfifo $fifo1
-mkfifo $fifo2
-mkfifo $fifo3
 mkdir $dir
 
 gcc -Wall -o datownik datownik.c -lrt
 gcc -Wall -o odbiornik odbiornik.c
 gcc -Wall -o powielacz powielacz.c
 
-./odbiornik "/tmp/c1" > $dir/w1.txt 2>&1 &
 
-./odbiornik "/tmp/c4" > $dir/w4.txt 2>&1 &
+
+
+./odb $fifo1 > $dir/fifo1.txt 2>&1 &
 pid1=$!
+./odb $fifo4 > $dir/fifo4.txt 2>&1 &
 disown $pid1
 
-./datownik -m1 -d0.5 -w7 -s1 | ./powielacz -p$fifo -c7 -L$diag &
-sleep 3
+
+./dat -m1 -d0.5 -w10 -s1 | ./pow -p $fifo -c6 -L$diag &
+
+#-L$diag &
+sleep 4
 kill -9 $pid1 &
 echo "Koniec dzialania skryptu"
 sleep 1
+unlink $fifo1
+unlink $fifo4
 exit
